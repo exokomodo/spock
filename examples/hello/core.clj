@@ -1,38 +1,57 @@
 (ns spock.examples.hello.core
   "Hello Vulkan — triangle with animated clear color.
    Mirrors exokomodo/drakon examples/hello/main.cpp"
-  (:require [spock.game.core :as game]
+  (:require [spock.game.core     :as game]
             [spock.renderable.core :as renderable]
-            [spock.renderer.core :as renderer])
+            [spock.renderer.core   :as renderer]
+            [spock.pipeline.core   :as pipeline])
   (:gen-class))
 
 ;; ---------------------------------------------------------------------------
 ;; TriangleRenderable
 ;; ---------------------------------------------------------------------------
-;; TODO #3 — implement pipeline creation (depends on #2 being fully wired)
-(defrecord TriangleRenderable [shader-dir pipeline-state]
+(defrecord TriangleRenderable [shader-dir pipeline-atom]
   renderable/Renderable
+
   (draw [this command-buffer device render-pass extent]
-    ;; TODO #6 — ensure-pipeline, vkCmdBindPipeline, vkCmdDraw 3 verts
-    nil))
+    ;; Lazily build the pipeline on first draw call — device/render-pass/extent
+    ;; are not available until the renderer is initialised.
+    (when (nil? (:pipeline @pipeline-atom))
+      (let [pl (-> (pipeline/builder device render-pass {:width  (.width  ^org.lwjgl.vulkan.VkExtent2D extent)
+                                                          :height (.height ^org.lwjgl.vulkan.VkExtent2D extent)})
+                   (pipeline/vert-path (str shader-dir "triangle.vert"))
+                   (pipeline/frag-path (str shader-dir "triangle.frag"))
+                   (pipeline/topology  :triangle-list)
+                   (pipeline/cull-mode :back)
+                   (pipeline/build!))]
+        (reset! pipeline-atom pl)))
+    ;; Record draw commands
+    (let [{:keys [pipeline layout]} @pipeline-atom]
+      (when (and pipeline layout)
+        (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
+          ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+          org.lwjgl.vulkan.VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
+          (long pipeline))
+        (org.lwjgl.vulkan.VK10/vkCmdDraw
+          ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+          3 1 0 0)))))
 
 (defn make-triangle-renderable [shader-dir]
-  (->TriangleRenderable shader-dir (atom {:pipeline-layout 0
-                                          :graphics-pipeline 0})))
+  (->TriangleRenderable shader-dir (atom {})))
 
 ;; ---------------------------------------------------------------------------
 ;; HelloGame lifecycle
 ;; ---------------------------------------------------------------------------
 (defn- update-clear-color! [game delta dirs]
-  (let [color  (renderer/get-clear-color (:renderer game))
-        new-color (mapv (fn [c d] (-> (+ c (* d delta))
+  (let [color     (renderer/get-clear-color (:renderer game))
+        new-color (mapv (fn [c d] (-> (+ c (* (double d) (double delta)))
                                       (max 0.0)
                                       (min 1.0)))
                         color dirs)
         new-dirs  (mapv (fn [c' d]
-                          (cond (>= c' 1.0) (- (Math/abs d))
-                                (<= c' 0.0)  (Math/abs d)
-                                :else        d))
+                          (cond (>= (double c') 1.0) (- (Math/abs (double d)))
+                                (<= (double c') 0.0) (Math/abs (double d))
+                                :else d))
                         new-color dirs)]
     (renderer/set-clear-color! (:renderer game) new-color)
     new-dirs))
@@ -40,16 +59,16 @@
 (defrecord HelloGame [g dirs-atom]
   game/GameLifecycle
 
-  (on-init! [this]
+  (on-init! [_this]
     (println "Initializing Hello Vulkan")
     (let [shader-dir (str (System/getProperty "user.dir")
                           "/examples/hello/shaders/")]
       (game/add-renderable! g (make-triangle-renderable shader-dir))))
 
-  (on-tick! [this delta]
+  (on-tick! [_this delta]
     (swap! dirs-atom #(update-clear-color! g delta %)))
 
-  (on-done! [this]
+  (on-done! [_this]
     (println "Hello Vulkan done")))
 
 ;; ---------------------------------------------------------------------------
