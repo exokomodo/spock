@@ -1,6 +1,6 @@
 (ns spock.core-test
   (:require [clojure.test :refer [deftest is testing]]
-            [spock.shader.core :as shader]
+            [spock.renderer.core :as renderer]
             [spock.renderer.vulkan :as vk]
             [spock.game.core :as game]))
 

@@ -595,11 +595,28 @@
 (defrecord VulkanRenderer [state]
   renderer/Renderer
 
+  (create-surface! [_this window-handle]
+    ;; Called on the main thread. Instance must already exist.
+    ;; If instance doesn't exist yet, create it here (it's thread-safe to do so).
+    (swap! state assoc :window-handle window-handle)
+    (try
+      (when (= VK_NULL (:instance @state))
+        (create-instance! state))
+      (create-surface! state)
+      true
+      (catch Exception e
+        (println "[VulkanRenderer] create-surface! failed:" (.getMessage e))
+        false)))
+
   (init! [_this window-handle width height]
+    ;; Called on the render thread. Surface already exists.
     (swap! state assoc :window-handle window-handle :width width :height height)
     (try
-      (create-instance! state)
-      (create-surface! state)
+      ;; Instance + surface may already be set from create-surface! call
+      (when (= VK_NULL (:instance @state))
+        (create-instance! state))
+      (when (= VK_NULL (:surface @state))
+        (create-surface! state))
       (pick-physical-device! state)
       (create-logical-device! state)
       (create-swapchain! state)
