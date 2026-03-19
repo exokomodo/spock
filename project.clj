@@ -1,0 +1,32 @@
+(defproject spock "0.1.0-SNAPSHOT"
+  :description "A Vulkan game engine written in Clojure"
+  :url "https://github.com/exokomodo/spock"
+  :license {:name "CC0 1.0 Universal"
+            :url "https://creativecommons.org/publicdomain/zero/1.0/"}
+
+  :dependencies [[org.clojure/clojure "1.12.0"]
+                 ;; LWJGL BOM — core + Vulkan + GLFW + OpenAL + natives
+                 [org.lwjgl/lwjgl "3.3.4"]
+                 [org.lwjgl/lwjgl-vulkan "3.3.4"]
+                 [org.lwjgl/lwjgl-glfw "3.3.4"]
+                 [org.lwjgl/lwjgl-openal "3.3.4"]
+                 ;; Natives — Linux aarch64 (Raspberry Pi 5) + x86_64
+                 [org.lwjgl/lwjgl "3.3.4" :classifier "natives-linux-arm64"]
+                 [org.lwjgl/lwjgl-glfw "3.3.4" :classifier "natives-linux-arm64"]
+                 [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-linux-arm64"]
+                 [org.lwjgl/lwjgl "3.3.4" :classifier "natives-linux"]
+                 [org.lwjgl/lwjgl-glfw "3.3.4" :classifier "natives-linux"]
+                 [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-linux"]]
+  ;; Note: lwjgl-vulkan has no natives — it uses the system Vulkan loader (libvulkan.so)
+
+  :source-paths ["src"]
+  :test-paths ["test"]
+  :resource-paths ["resources"]
+
+  :profiles
+  {:hello {:main spock.examples.hello.core
+           :aot [spock.examples.hello.core]
+           :source-paths ["src" "examples"]}}
+
+  :aliases
+  {"hello" ["with-profile" "hello" "run"]})
