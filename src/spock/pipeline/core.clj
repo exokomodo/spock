@@ -73,6 +73,12 @@
     (throw (RuntimeException. (str "Failed to compile: " path))))
   (frag-spv cfg (shader/load-spirv (str path ".spv"))))
 
+(defn descriptor-layout
+  "Add descriptor set bindings to the pipeline config.
+   bindings is a vector of {:binding int :type :combined-image-sampler :stage :fragment}."
+  [cfg bindings]
+  (assoc cfg :descriptor-bindings bindings))
+
 ;; ---------------------------------------------------------------------------
 ;; Shader module helper
 ;; ---------------------------------------------------------------------------
@@ -88,12 +94,58 @@
       (.get lp 0))))
 
 ;; ---------------------------------------------------------------------------
+;; Descriptor set layout helper
+;; ---------------------------------------------------------------------------
+(defn- binding-type->vk [t]
+  (case t
+    :combined-image-sampler VK10/VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+    :uniform-buffer         VK10/VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+    :storage-buffer         VK10/VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+    (int t)))
+
+(defn- binding-stage->vk [s]
+  (case s
+    :vertex   VK10/VK_SHADER_STAGE_VERTEX_BIT
+    :fragment VK10/VK_SHADER_STAGE_FRAGMENT_BIT
+    :all      VK10/VK_SHADER_STAGE_ALL_GRAPHICS
+    (int s)))
+
+(defn- create-descriptor-set-layout!
+  "Create a VkDescriptorSetLayout from a vector of binding descriptors.
+   Returns the layout handle (long)."
+  [^VkDevice device bindings]
+  (let [stack (MemoryStack/stackPush)]
+    (try
+      (let [n   (count bindings)
+            buf (VkDescriptorSetLayoutBinding/calloc n stack)]
+        (dorun
+          (map-indexed
+            (fn [i {:keys [binding type stage]}]
+              (doto ^VkDescriptorSetLayoutBinding (.get buf (int i))
+                (.binding         (int binding))
+                (.descriptorType  (int (binding-type->vk type)))
+                (.descriptorCount 1)
+                (.stageFlags      (int (binding-stage->vk stage)))
+                (.pImmutableSamplers nil)))
+            bindings))
+        (let [ci (doto (VkDescriptorSetLayoutCreateInfo/calloc stack)
+                   (.sType VK10/VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
+                   (.pBindings buf))
+              lp (.mallocLong stack 1)
+              r  (VK10/vkCreateDescriptorSetLayout device ci nil lp)]
+          (when (not= r VK10/VK_SUCCESS)
+            (throw (RuntimeException. (str "vkCreateDescriptorSetLayout failed: " r))))
+          (.get lp 0)))
+      (finally
+        (MemoryStack/stackPop)))))
+
+;; ---------------------------------------------------------------------------
 ;; build!
 ;; ---------------------------------------------------------------------------
 (defn build! [{:keys [^VkDevice device render-pass
                       vert-spv frag-spv
                       topology cull-mode front-face polygon-mode
-                      push-constant-size vertex-input]}]
+                      push-constant-size vertex-input descriptor-bindings]}]
   (when-not vert-spv (throw (RuntimeException. "No vertex shader")))
   (when-not frag-spv (throw (RuntimeException. "No fragment shader")))
 
@@ -199,19 +251,31 @@
                           (.pAttachments cb att-buf)
 
                           ;; ---- pipeline layout ----
-                          (let [layout-ci (VkPipelineLayoutCreateInfo/calloc stack)]
+                          (let [layout-ci (VkPipelineLayoutCreateInfo/calloc stack)
+                                ;; Optionally create descriptor set layout
+                                dsl-handle (when (seq descriptor-bindings)
+                                             (create-descriptor-set-layout! device descriptor-bindings))]
                             (.sType layout-ci VK10/VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
                             ;; Optional push constant range
                             (when push-constant-size
                               (let [pcr (VkPushConstantRange/calloc 1 ^MemoryStack stack)
                                     r0  (.get pcr 0)]
-                                (.stageFlags r0 VK10/VK_SHADER_STAGE_VERTEX_BIT)
+                                (.stageFlags r0 (bit-or VK10/VK_SHADER_STAGE_VERTEX_BIT
+                                                        VK10/VK_SHADER_STAGE_FRAGMENT_BIT))
                                 (.offset     r0 0)
                                 (.size       r0 (int push-constant-size))
                                 (.pPushConstantRanges layout-ci pcr)))
+                            ;; Optional descriptor set layout
+                            (when dsl-handle
+                              (let [dsl-buf (doto (.mallocLong stack 1)
+                                              (.put (long dsl-handle))
+                                              (.flip))]
+                                (.pSetLayouts layout-ci dsl-buf)))
                             (let [lp (.mallocLong stack 1)
                                   r  (VK10/vkCreatePipelineLayout device layout-ci nil lp)]
                               (when (not= r VK10/VK_SUCCESS)
+                                (when dsl-handle
+                                  (VK10/vkDestroyDescriptorSetLayout device (long dsl-handle) nil))
                                 (throw (RuntimeException. (str "vkCreatePipelineLayout failed: " r))))
                               (let [layout (.get lp 0)
 
@@ -242,9 +306,10 @@
                                     (throw (RuntimeException. (str "vkCreateGraphicsPipelines failed: " r))))
                                   (let [pipeline (.get lp 0)]
                                     (log/log "pipeline/build! OK pipeline=" pipeline "layout=" layout)
-                                    {:pipeline pipeline
-                                     :layout   layout
-                                     :device   device})))))))))))))))
+                                    {:pipeline               pipeline
+                                     :layout                 layout
+                                     :device                 device
+                                     :descriptor-set-layout  dsl-handle})))))))))))))))
       (finally
         (VK10/vkDestroyShaderModule device vert-mod nil)
         (VK10/vkDestroyShaderModule device frag-mod nil)
@@ -267,7 +332,79 @@
 ;; ---------------------------------------------------------------------------
 ;; destroy!
 ;; ---------------------------------------------------------------------------
-(defn destroy! [{:keys [^VkDevice device pipeline layout]}]
+(defn destroy! [{:keys [^VkDevice device pipeline layout descriptor-set-layout]}]
   (when (and device pipeline layout)
     (VK10/vkDestroyPipeline       device (long pipeline) nil)
-    (VK10/vkDestroyPipelineLayout device (long layout)   nil)))
+    (VK10/vkDestroyPipelineLayout device (long layout)   nil)
+    (when descriptor-set-layout
+      (VK10/vkDestroyDescriptorSetLayout device (long descriptor-set-layout) nil))))
+
+;; ---------------------------------------------------------------------------
+;; Descriptor pool + set allocation
+;; ---------------------------------------------------------------------------
+
+(defn create-descriptor-pool!
+  "Create a VkDescriptorPool capable of allocating max-sets combined-image-sampler descriptors.
+   Returns the pool handle (long)."
+  [^VkDevice device max-sets]
+  (let [stack (MemoryStack/stackPush)]
+    (try
+      (let [ps  (doto (VkDescriptorPoolSize/calloc 1 stack)
+                  (-> (.get 0)
+                      (doto
+                        (.type VK10/VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                        (.descriptorCount (int max-sets)))))
+            ci  (doto (VkDescriptorPoolCreateInfo/calloc stack)
+                  (.sType VK10/VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
+                  (.pPoolSizes ps)
+                  (.maxSets (int max-sets)))
+            lp  (.mallocLong stack 1)
+            r   (VK10/vkCreateDescriptorPool device ci nil lp)]
+        (when (not= r VK10/VK_SUCCESS)
+          (throw (RuntimeException. (str "vkCreateDescriptorPool failed: " r))))
+        (.get lp 0))
+      (finally
+        (MemoryStack/stackPop)))))
+
+(defn allocate-descriptor-set!
+  "Allocate a VkDescriptorSet from pool and write texture at binding 0.
+   pipeline-map  — result of build! (must have :descriptor-set-layout and :device)
+   desc-pool     — VkDescriptorPool handle (long)
+   texture-map   — result of spock.texture.core/load-texture!
+                   (must have :image-view and :sampler)
+   Returns the descriptor set handle (long)."
+  [{:keys [^VkDevice device descriptor-set-layout]} desc-pool texture-map]
+  (let [stack (MemoryStack/stackPush)]
+    (try
+      (let [dsl-buf (doto (.mallocLong stack 1)
+                      (.put (long descriptor-set-layout))
+                      (.flip))
+            ai  (doto (VkDescriptorSetAllocateInfo/calloc stack)
+                  (.sType VK10/VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO)
+                  (.descriptorPool (long desc-pool))
+                  (.pSetLayouts dsl-buf))
+            lp  (.mallocLong stack 1)
+            r   (VK10/vkAllocateDescriptorSets device ai lp)]
+        (when (not= r VK10/VK_SUCCESS)
+          (throw (RuntimeException. (str "vkAllocateDescriptorSets failed: " r))))
+        (let [ds      (.get lp 0)
+              img-info (doto (VkDescriptorImageInfo/calloc 1 stack)
+                         (-> (.get 0)
+                             (doto
+                               (.imageLayout VK10/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                               (.imageView   (long (:image-view texture-map)))
+                               (.sampler     (long (:sampler    texture-map))))))
+              write   (doto (VkWriteDescriptorSet/calloc 1 stack)
+                        (-> (.get 0)
+                            (doto
+                              (.sType VK10/VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
+                              (.dstSet ds)
+                              (.dstBinding 0)
+                              (.dstArrayElement 0)
+                              (.descriptorType VK10/VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                              (.descriptorCount 1)
+                              (.pImageInfo img-info))))]
+          (VK10/vkUpdateDescriptorSets device write nil)
+          ds))
+      (finally
+        (MemoryStack/stackPop)))))
