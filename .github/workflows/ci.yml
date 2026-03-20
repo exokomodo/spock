@@ -37,10 +37,12 @@ jobs:
             xvfb
 
       - name: Install project dependencies
-        run: make deps
+        run: |
+          make deps
 
       - name: Compile (syntax check)
-        run: make check
+        run: |
+          make check
 
       - name: Compile shaders
         run: |
@@ -48,7 +50,8 @@ jobs:
           make shaders/polygon
 
       - name: Run tests
-        run: make test
+        run: |
+          make test
 
       - name: Run hello example headlessly (auto-closes after 5 s)
         env:
