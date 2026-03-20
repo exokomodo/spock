@@ -44,7 +44,12 @@ endif
 ##@ Setup environment
 
 .PHONY: setup
-setup: setup/lein ## Setup the development environment
+setup: setup/lein setup/hooks ## Setup the development environment
+
+.PHONY: setup/hooks
+setup/hooks: ## Install git hooks
+	ln -sf "$(PWD)/git/hooks/pre-commit" .git/hooks/pre-commit
+	echo "✅ Git hooks installed"
 
 .PHONY: setup/lein
 setup/lein:
