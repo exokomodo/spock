@@ -10,8 +10,6 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: all build test clean run/hello setup
-
 # Detect headless environment: no Wayland or X11 display available.
 # If headless, prefix commands that open windows with cage (Wayland kiosk).
 # cage is only used when the binary is available; otherwise fail loudly.
