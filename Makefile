@@ -20,8 +20,6 @@ ifeq ($(WAYLAND_DISPLAY)$(DISPLAY),)
     ifdef CAGE_AVAILABLE
       DISPLAY_PREFIX := cage --
     else
-      $(warning Neither WAYLAND_DISPLAY nor DISPLAY is set, and cage is not installed.)
-      $(warning Install cage or run from a Wayland/X11 session.)
       DISPLAY_PREFIX :=
     endif
   else
@@ -52,6 +50,14 @@ setup: setup/lein ## Setup the development environment
 setup/lein:
 	curl -fL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein > $(BIN_DIR)/lein
 	chmod +x $(BIN_DIR)/lein
+
+.PHONY: setup/glslc
+setup/glslc: ## Install glslc shader compiler (macOS: brew; Linux: apt)
+ifeq ($(OS),Darwin)
+	brew install glslang
+else
+	sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends glslang-tools
+endif
 
 ##@ Development tools
 .PHONY: build
