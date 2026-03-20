@@ -99,13 +99,13 @@
         rate   (int (.getSampleRate fmt))
         ;; Normalise to PCM_SIGNED 16-bit
         target-fmt (AudioFormat.
-                     AudioFormat$Encoding/PCM_SIGNED
-                     (float rate)
-                     16
-                     (int (.getChannels fmt))
-                     (int (* (.getChannels fmt) 2))
-                     (float rate)
-                     false)     ; little-endian
+                    AudioFormat$Encoding/PCM_SIGNED
+                    (float rate)
+                    16
+                    (int (.getChannels fmt))
+                    (int (* (.getChannels fmt) 2))
+                    (float rate)
+                    false)     ; little-endian
         stream2  (AudioSystem/getAudioInputStream target-fmt stream)
         fmt2     (.getFormat stream2)
         channels (int (.getChannels fmt2))
