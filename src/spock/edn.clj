@@ -33,16 +33,6 @@
             [spock.log             :as log]))
 
 ;; ---------------------------------------------------------------------------
-;; Public registry API (re-exported for convenience)
-;; ---------------------------------------------------------------------------
-
-(def register-renderable!
-  "Register a custom renderable type by keyword.
-   constructor-fn is (fn [cfg renderer] renderable).
-   See spock.renderable.registry/register-renderable! for details."
-  registry/register-renderable!)
-
-;; ---------------------------------------------------------------------------
 ;; Component instantiation
 ;; ---------------------------------------------------------------------------
 
