@@ -71,7 +71,7 @@ jobs:
           DISPLAY=:99 \
           VK_ICD_FILENAMES=$LVP_ICD \
           LIBGL_ALWAYS_SOFTWARE=1 \
-          timeout 30 lein with-profile edn run -- examples/hello/game.edn
+          timeout 30 lein with-profile hello run -- examples/hello/game.edn
           EXIT=$?
           kill $XVFB_PID 2>/dev/null || true
           exit $EXIT
