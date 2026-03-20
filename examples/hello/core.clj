@@ -43,8 +43,7 @@
                    (pipeline/vert-path (str shader-dir "triangle.vert"))
                    (pipeline/frag-path (str shader-dir "triangle.frag"))
                    (pipeline/topology   :triangle-list)
-                   (pipeline/cull-mode  :back)
-                   (pipeline/front-face :counter-clockwise)
+                   (pipeline/cull-mode  :none)
                    (pipeline/build!))]
         (log/log "pipeline built:" (:pipeline pl))
         (reset! (:pipeline-atom renderable) pl))
