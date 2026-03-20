@@ -100,12 +100,8 @@
             si  (doto (VkSubmitInfo/calloc stack)
                   (.sType VK10/VK_STRUCTURE_TYPE_SUBMIT_INFO)
                   (.pCommandBuffers cbp))]
-        (println "[texture] submitting to queue...")
-        (let [r2 (VK10/vkQueueSubmit graphics-queue si VK10/VK_NULL_HANDLE)]
-          (println "[texture] submit result=" r2)
-          (println "[texture] waiting idle...")
-          (VK10/vkQueueWaitIdle graphics-queue)
-          (println "[texture] wait done")))
+        (VK10/vkQueueSubmit graphics-queue si VK10/VK_NULL_HANDLE)
+        (VK10/vkQueueWaitIdle graphics-queue))
       (finally
         (MemoryStack/stackPop))))
   (let [stack (MemoryStack/stackPush)]
@@ -351,11 +347,11 @@
             _  (let [stack (MemoryStack/stackPush)]
                  (try
                    (let [pp (.mallocPointer stack 1)]
-                     (VK10/vkMapMemory device buffer 0 (long img-size) 0 pp)
+                     (VK10/vkMapMemory device staging-memory 0 (long img-size) 0 pp)
                      (let [dst (MemoryUtil/memByteBuffer (.get pp 0) (int img-size))]
                        (.rewind pixel-buf)
                        (.put dst pixel-buf))
-                     (VK10/vkUnmapMemory device buffer))
+                     (VK10/vkUnmapMemory device staging-memory))
                    (finally
                      (MemoryStack/stackPop))))
             _  (MemoryUtil/memFree pixel-buf)
