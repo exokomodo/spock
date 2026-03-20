@@ -3,4 +3,4 @@
 
  ;; Log level: :error :warn :info :debug :trace
  ;; Default is :info — set :trace for full engine verbosity during development
- :log-level :warn}
+ :log-level :info}
