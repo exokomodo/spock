@@ -1,0 +1,17 @@
+name: Setup lein
+runs:
+  using: composite
+  steps:
+    - name: Install lein
+      shell: bash
+      run: |
+        mkdir -p "${HOME}/.local/bin"
+        curl -fsSL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein \
+          -o "${HOME}/.local/bin/lein"
+        chmod +x "${HOME}/.local/bin/lein"
+        lein version
+
+    - name: Fix PATH
+      shell: bash
+      run: |
+        echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
