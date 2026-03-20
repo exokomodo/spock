@@ -1,20 +1,7 @@
 (ns spock.pipeline.core
-  "Data-driven Vulkan graphics pipeline builder.
-
-   Usage:
-     (-> (pipeline/builder device render-pass extent)
-         (pipeline/vert-spv   spirv-byte-buffer)
-         (pipeline/frag-spv   spirv-byte-buffer)
-         (pipeline/topology   :triangle-list)   ; default
-         (pipeline/cull-mode  :back)            ; default
-         (pipeline/blend-mode :opaque)          ; default
-         (pipeline/vertex-input [])             ; default — no vertex buffers
-         (pipeline/build!))
-     ;; => {:pipeline long :layout long}
-
-   All options are optional; the defaults produce a simple
-   fill-mode triangle pipeline matching the drakon hello example."
-  (:require [spock.shader.core :as shader])
+  "Data-driven Vulkan graphics pipeline builder."
+  (:require [spock.shader.core :as shader]
+            [spock.log :as log])
   (:import [org.lwjgl.system MemoryStack]
            [org.lwjgl.vulkan
             VK10
@@ -33,275 +20,191 @@
             VkShaderModuleCreateInfo]))
 
 ;; ---------------------------------------------------------------------------
-;; Keyword → Vulkan constant maps
-;; ---------------------------------------------------------------------------
-(def ^:private topology-map
-  {:point-list                  VK10/VK_PRIMITIVE_TOPOLOGY_POINT_LIST
-   :line-list                   VK10/VK_PRIMITIVE_TOPOLOGY_LINE_LIST
-   :line-strip                  VK10/VK_PRIMITIVE_TOPOLOGY_LINE_STRIP
-   :triangle-list               VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
-   :triangle-strip              VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
-   :triangle-fan                VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN})
-
-(def ^:private cull-mode-map
-  {:none  VK10/VK_CULL_MODE_NONE
-   :front VK10/VK_CULL_MODE_FRONT_BIT
-   :back  VK10/VK_CULL_MODE_BACK_BIT
-   :both  VK10/VK_CULL_MODE_FRONT_AND_BACK})
-
-(def ^:private polygon-mode-map
-  {:fill  VK10/VK_POLYGON_MODE_FILL
-   :line  VK10/VK_POLYGON_MODE_LINE
-   :point VK10/VK_POLYGON_MODE_POINT})
-
-;; ---------------------------------------------------------------------------
 ;; Builder constructor
 ;; ---------------------------------------------------------------------------
-(defn builder
-  "Create a pipeline config map.
-   device      — VkDevice
-   render-pass — long handle
-   Viewport and scissor are dynamic — set per-frame via vkCmdSetViewport/Scissor."
-  [^VkDevice device render-pass]
-  {:device      device
-   :render-pass render-pass
-   ;; Shader stages (populated by vert-spv / frag-spv)
-   :vert-spv    nil
-   :frag-spv    nil
-   ;; Pipeline state options
-   :topology    :triangle-list
-   :cull-mode   :back
-   :front-face  :clockwise
-   :polygon-mode :fill
-   :blend-mode  :opaque
-   ;; Vertex input — seq of VkVertexInputBindingDescription / AttributeDescription maps
-   ;; Empty = no vertex buffers (hardcoded vertices in shader)
-   :vertex-bindings   []
-   :vertex-attributes []})
+(defn builder [^VkDevice device render-pass]
+  {:device       device
+   :render-pass  render-pass
+   :vert-spv     nil
+   :frag-spv     nil
+   :topology     VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+   :cull-mode    VK10/VK_CULL_MODE_NONE
+   :front-face   VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE
+   :polygon-mode VK10/VK_POLYGON_MODE_FILL})
 
 ;; ---------------------------------------------------------------------------
-;; Builder option setters
+;; Option setters
 ;; ---------------------------------------------------------------------------
-(defn vert-spv
-  "Set the vertex shader SPIR-V. buf is a java.nio.ByteBuffer."
-  [config ^java.nio.ByteBuffer buf]
-  (assoc config :vert-spv buf))
+(defn vert-spv    [cfg buf]  (assoc cfg :vert-spv buf))
+(defn frag-spv    [cfg buf]  (assoc cfg :frag-spv buf))
+(defn topology    [cfg t]    (assoc cfg :topology    (case t :triangle-list VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST t)))
+(defn cull-mode   [cfg m]    (assoc cfg :cull-mode   (case m :none VK10/VK_CULL_MODE_NONE :back VK10/VK_CULL_MODE_BACK_BIT :front VK10/VK_CULL_MODE_FRONT_BIT m)))
+(defn front-face  [cfg f]    (assoc cfg :front-face  (case f :clockwise VK10/VK_FRONT_FACE_CLOCKWISE :counter-clockwise VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE f)))
+(defn polygon-mode [cfg m]   (assoc cfg :polygon-mode (case m :fill VK10/VK_POLYGON_MODE_FILL :line VK10/VK_POLYGON_MODE_LINE m)))
 
-(defn frag-spv
-  "Set the fragment shader SPIR-V. buf is a java.nio.ByteBuffer."
-  [config ^java.nio.ByteBuffer buf]
-  (assoc config :frag-spv buf))
+(defn vert-path [cfg path]
+  (when-not (shader/compile-glsl path)
+    (throw (RuntimeException. (str "Failed to compile: " path))))
+  (vert-spv cfg (shader/load-spirv (str path ".spv"))))
 
-(defn vert-path
-  "Load and set vertex shader from a GLSL source path (compiles to SPIR-V)."
-  [config ^String glsl-path]
-  (when-not (shader/compile-glsl glsl-path)
-    (throw (RuntimeException. (str "Failed to compile vertex shader: " glsl-path))))
-  (let [buf (shader/load-spirv (str glsl-path ".spv"))]
-    (when-not buf
-      (throw (RuntimeException. (str "Failed to load vertex SPIR-V: " glsl-path ".spv"))))
-    (vert-spv config buf)))
-
-(defn frag-path
-  "Load and set fragment shader from a GLSL source path (compiles to SPIR-V)."
-  [config ^String glsl-path]
-  (when-not (shader/compile-glsl glsl-path)
-    (throw (RuntimeException. (str "Failed to compile fragment shader: " glsl-path))))
-  (let [buf (shader/load-spirv (str glsl-path ".spv"))]
-    (when-not buf
-      (throw (RuntimeException. (str "Failed to load fragment SPIR-V: " glsl-path ".spv"))))
-    (frag-spv config buf))  )
-
-(defn topology   [config t]   (assoc config :topology t))
-(defn cull-mode  [config m]   (assoc config :cull-mode m))
-(defn front-face [config f]   (assoc config :front-face f))
-(defn polygon-mode [config m] (assoc config :polygon-mode m))
-(defn blend-mode [config m]   (assoc config :blend-mode m))
-(defn vertex-input
-  "Set vertex bindings + attributes.
-   bindings   — seq of {:binding int :stride int :input-rate :vertex/:instance}
-   attributes — seq of {:location int :binding int :format int :offset int}"
-  [config bindings attributes]
-  (assoc config :vertex-bindings bindings :vertex-attributes attributes))
+(defn frag-path [cfg path]
+  (when-not (shader/compile-glsl path)
+    (throw (RuntimeException. (str "Failed to compile: " path))))
+  (frag-spv cfg (shader/load-spirv (str path ".spv"))))
 
 ;; ---------------------------------------------------------------------------
-;; Internal helpers
+;; Shader module helper
 ;; ---------------------------------------------------------------------------
-(defn- create-shader-module
-  "Allocate a VkShaderModule from a SPIR-V ByteBuffer. Returns the handle (long)."
-  [^VkDevice device ^java.nio.ByteBuffer spv]
-  (let [^MemoryStack stack (MemoryStack/stackPush)
-        ci (doto (VkShaderModuleCreateInfo/calloc stack)
-             (.sType VK10/VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO)
-             (.pCode spv))
-        lp (.mallocLong stack 1)
-        _  (let [r (VK10/vkCreateShaderModule device ci nil lp)]
-             (when (not= r VK10/VK_SUCCESS)
-               (MemoryStack/stackPop)
-               (throw (RuntimeException. (str "vkCreateShaderModule failed (VkResult=" r ")")))))]
-    (let [handle (.get lp 0)]
-      (MemoryStack/stackPop)
-      handle)))
-
-(defn- front-face->vk [f]
-  (case f
-    :clockwise         VK10/VK_FRONT_FACE_CLOCKWISE
-    :counter-clockwise VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE))
+(defn- create-shader-module ^long [^VkDevice device ^java.nio.ByteBuffer spv]
+  (let [stack (MemoryStack/stackGet)
+        ci    (VkShaderModuleCreateInfo/calloc stack)]
+    (.sType ci VK10/VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO)
+    (.pCode ci spv)
+    (let [lp (-> stack (.mallocLong 1))
+          r  (VK10/vkCreateShaderModule device ci nil lp)]
+      (when (not= r VK10/VK_SUCCESS)
+        (throw (RuntimeException. (str "vkCreateShaderModule failed: " r))))
+      (.get lp 0))))
 
 ;; ---------------------------------------------------------------------------
 ;; build!
 ;; ---------------------------------------------------------------------------
-(defn build!
-  "Allocate VkPipelineLayout + VkGraphicsPipeline from the config map.
-   Returns {:pipeline long :layout long} or throws on failure.
-   Caller is responsible for calling destroy! when done."
-  [config]
-  (let [{:keys [^VkDevice device render-pass
-                vert-spv frag-spv
-                topology cull-mode front-face polygon-mode
-                blend-mode]} config]
-    (when-not vert-spv (throw (RuntimeException. "Pipeline builder: no vertex shader set")))
-    (when-not frag-spv (throw (RuntimeException. "Pipeline builder: no fragment shader set")))
+(defn build! [{:keys [^VkDevice device render-pass
+                      vert-spv frag-spv
+                      topology cull-mode front-face polygon-mode]}]
+  (when-not vert-spv (throw (RuntimeException. "No vertex shader")))
+  (when-not frag-spv (throw (RuntimeException. "No fragment shader")))
 
-    (let [^MemoryStack stack (MemoryStack/stackPush)
-          ;; Shader modules (temporary — destroyed after pipeline creation)
-          vert-mod (create-shader-module device vert-spv)
-          frag-mod (create-shader-module device frag-spv)
+  (let [stack (MemoryStack/stackPush)
+        vert-mod (create-shader-module device vert-spv)
+        frag-mod (create-shader-module device frag-spv)]
+    (try
+      ;; ---- shader stages ----
+      (let [stages (VkPipelineShaderStageCreateInfo/calloc 2 ^MemoryStack stack)]
 
-          ;; Shader stages
-          stages (doto (VkPipelineShaderStageCreateInfo/callocStack 2 stack)
-                   (-> (.get 0)
-                       (doto (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
-                             (.stage VK10/VK_SHADER_STAGE_VERTEX_BIT)
-                             (.module vert-mod)
-                             (.pName (.UTF8 stack "main" true))))
-                   (-> (.get 1)
-                       (doto (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
-                             (.stage VK10/VK_SHADER_STAGE_FRAGMENT_BIT)
-                             (.module frag-mod)
-                             (.pName (.UTF8 stack "main" true)))))
+        (let [s (.get stages 0)]
+          (.sType s VK10/VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
+          (.stage s VK10/VK_SHADER_STAGE_VERTEX_BIT)
+          (.module s vert-mod)
+          (.pName s (.UTF8 stack "main" true)))
 
-          ;; Vertex input — no vertex buffers by default
-          ;; No vertex buffers — hardcoded vertices in shader.
-          ;; Counts are derived from buffer sizes; passing nil leaves them 0.
-          vertex-input-ci (doto (VkPipelineVertexInputStateCreateInfo/calloc stack)
-                            (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
-                            (.pVertexBindingDescriptions nil)
-                            (.pVertexAttributeDescriptions nil))
+        (let [s (.get stages 1)]
+          (.sType s VK10/VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
+          (.stage s VK10/VK_SHADER_STAGE_FRAGMENT_BIT)
+          (.module s frag-mod)
+          (.pName s (.UTF8 stack "main" true)))
 
-          ;; Input assembly
-          input-assembly (doto (VkPipelineInputAssemblyStateCreateInfo/calloc stack)
-                           (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO)
-                           (.topology (get topology-map topology VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
-                           (.primitiveRestartEnable false))
+        ;; ---- vertex input ----
+        (let [vi (VkPipelineVertexInputStateCreateInfo/calloc stack)]
+          (.sType vi VK10/VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
+          ;; no vertex buffers — hardcoded in shader
 
-          ;; Viewport + scissor — dynamic state, set per-frame via vkCmdSetViewport/Scissor
-          ;; Count must be declared here but actual values are set in the command buffer.
-          viewport-ci (doto (VkPipelineViewportStateCreateInfo/calloc stack)
-                        (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
-                        (.viewportCount 1)
-                        (.scissorCount 1))
+          ;; ---- input assembly ----
+          (let [ia (VkPipelineInputAssemblyStateCreateInfo/calloc stack)]
+            (.sType ia VK10/VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO)
+            (.topology ia (int topology))
+            (.primitiveRestartEnable ia false)
 
-          ;; Dynamic state declaration
-          dynamic-states (doto (.mallocInt stack 2)
-                           (.put 0 VK10/VK_DYNAMIC_STATE_VIEWPORT)
-                           (.put 1 VK10/VK_DYNAMIC_STATE_SCISSOR)
-                           .flip)
-          dynamic-ci (doto (VkPipelineDynamicStateCreateInfo/calloc stack)
-                       (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO)
-                       (.pDynamicStates dynamic-states))
+            ;; ---- viewport state (dynamic) ----
+            (let [vps (VkPipelineViewportStateCreateInfo/calloc stack)]
+              (.sType vps VK10/VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
+              (.viewportCount vps 1)
+              (.scissorCount vps 1)
 
-          ;; Rasterizer
-          raster (doto (VkPipelineRasterizationStateCreateInfo/calloc stack)
-                   (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO)
-                   (.depthClampEnable false)
-                   (.rasterizerDiscardEnable false)
-                   (.polygonMode (get polygon-mode-map polygon-mode VK10/VK_POLYGON_MODE_FILL))
-                   (.lineWidth 1.0)
-                   (.cullMode (get cull-mode-map cull-mode VK10/VK_CULL_MODE_BACK_BIT))
-                   (.frontFace (front-face->vk (or front-face :clockwise)))
-                   (.depthBiasEnable false))
+              ;; ---- dynamic state ----
+              (let [dyn-states (doto (.mallocInt stack 2)
+                                 (.put 0 VK10/VK_DYNAMIC_STATE_VIEWPORT)
+                                 (.put 1 VK10/VK_DYNAMIC_STATE_SCISSOR)
+                                 (.flip))
+                    dyn (VkPipelineDynamicStateCreateInfo/calloc stack)]
+                (.sType dyn VK10/VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO)
+                (.pDynamicStates dyn dyn-states)
 
-          ;; Multisampling — disabled
-          multisample (doto (VkPipelineMultisampleStateCreateInfo/calloc stack)
-                        (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO)
-                        (.sampleShadingEnable false)
-                        (.rasterizationSamples VK10/VK_SAMPLE_COUNT_1_BIT))
+                ;; ---- rasterizer ----
+                (let [rast (VkPipelineRasterizationStateCreateInfo/calloc stack)]
+                  (.sType rast VK10/VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO)
+                  (.depthClampEnable rast false)
+                  (.rasterizerDiscardEnable rast false)
+                  (.polygonMode rast (int polygon-mode))
+                  (.lineWidth rast 1.0)
+                  (.cullMode rast (int cull-mode))
+                  (.frontFace rast (int front-face))
+                  (.depthBiasEnable rast false)
 
-          ;; Color blend attachment
-          color-mask    (bit-or VK10/VK_COLOR_COMPONENT_R_BIT
-                                VK10/VK_COLOR_COMPONENT_G_BIT
-                                VK10/VK_COLOR_COMPONENT_B_BIT
-                                VK10/VK_COLOR_COMPONENT_A_BIT)
-          blend-att-buf (doto (VkPipelineColorBlendAttachmentState/calloc 1 ^MemoryStack stack)
-                          (-> (.get 0)
-                              (doto (.colorWriteMask color-mask)
-                                    (.blendEnable (not= blend-mode :opaque)))))
-          color-blend (doto (VkPipelineColorBlendStateCreateInfo/calloc stack)
-                        (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO)
-                        (.logicOpEnable false)
-                        (.logicOp VK10/VK_LOGIC_OP_COPY)
-                        (.attachmentCount 1)
-                        (.pAttachments blend-att-buf))
+                  ;; ---- multisampling ----
+                  (let [ms (VkPipelineMultisampleStateCreateInfo/calloc stack)]
+                    (.sType ms VK10/VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO)
+                    (.sampleShadingEnable ms false)
+                    (.rasterizationSamples ms VK10/VK_SAMPLE_COUNT_1_BIT)
 
-          ;; Pipeline layout (no push constants / descriptor sets yet)
-          layout-ci (doto (VkPipelineLayoutCreateInfo/calloc stack)
-                      (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
-                      (.pSetLayouts nil)
-                      (.pPushConstantRanges nil))
-          lp (.mallocLong stack 1)
-          _  (let [r (VK10/vkCreatePipelineLayout device layout-ci nil lp)]
-               (when (not= r VK10/VK_SUCCESS)
-                 (VK10/vkDestroyShaderModule device vert-mod nil)
-                 (VK10/vkDestroyShaderModule device frag-mod nil)
-                 (MemoryStack/stackPop)
-                 (throw (RuntimeException. (str "vkCreatePipelineLayout failed (VkResult=" r ")")))))
-          layout (.get lp 0)
+                    ;; ---- color blend attachment ----
+                    (let [att (VkPipelineColorBlendAttachmentState/calloc stack)
+                          color-mask (bit-or VK10/VK_COLOR_COMPONENT_R_BIT
+                                             VK10/VK_COLOR_COMPONENT_G_BIT
+                                             VK10/VK_COLOR_COMPONENT_B_BIT
+                                             VK10/VK_COLOR_COMPONENT_A_BIT)]
+                      (.colorWriteMask att color-mask)
+                      (.blendEnable att false)
 
-          ;; Graphics pipeline
-          pipeline-buf (doto (VkGraphicsPipelineCreateInfo/callocStack 1 stack)
-                         (-> (.get 0)
-                             (doto (.sType VK10/VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO)
-                                   (.stageCount 2)
-                                   (.pStages stages)
-                                   (.pVertexInputState vertex-input-ci)
-                                   (.pInputAssemblyState input-assembly)
-                                   (.pViewportState viewport-ci)
-                                   (.pRasterizationState raster)
-                                   (.pMultisampleState multisample)
-                                   (.pDepthStencilState nil)
-                                   (.pColorBlendState color-blend)
-                                   (.pDynamicState dynamic-ci)
-                                   (.layout layout)
-                                   (.renderPass (long render-pass))
-                                   (.subpass 0)
-                                   (.basePipelineHandle VK10/VK_NULL_HANDLE)
-                                   (.basePipelineIndex -1))))
-          _  (.rewind lp)
-          _  (let [r (VK10/vkCreateGraphicsPipelines device VK10/VK_NULL_HANDLE pipeline-buf nil lp)]
-               (when (not= r VK10/VK_SUCCESS)
-                 (VK10/vkDestroyPipelineLayout device layout nil)
-                 (VK10/vkDestroyShaderModule device vert-mod nil)
-                 (VK10/vkDestroyShaderModule device frag-mod nil)
-                 (MemoryStack/stackPop)
-                 (throw (RuntimeException. (str "vkCreateGraphicsPipelines failed (VkResult=" r ")")))))
-          pipeline (.get lp 0)]
+                      ;; wrap single att in a 1-element buffer via address
+                      (let [att-buf (VkPipelineColorBlendAttachmentState/create (.address att) 1)]
 
-      ;; Shader modules are no longer needed after pipeline creation
-      (VK10/vkDestroyShaderModule device vert-mod nil)
-      (VK10/vkDestroyShaderModule device frag-mod nil)
-      (MemoryStack/stackPop)
-      {:pipeline pipeline
-       :layout   layout
-       :device   device})))
+                        ;; ---- color blend state ----
+                        (let [cb (VkPipelineColorBlendStateCreateInfo/calloc stack)]
+                          (.sType cb VK10/VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO)
+                          (.logicOpEnable cb false)
+                          (.logicOp cb VK10/VK_LOGIC_OP_COPY)
+                          (.attachmentCount cb 1)
+                          (.pAttachments cb att-buf)
+
+                          ;; ---- pipeline layout ----
+                          (let [layout-ci (VkPipelineLayoutCreateInfo/calloc stack)]
+                            (.sType layout-ci VK10/VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+                            (let [lp (.mallocLong stack 1)
+                                  r  (VK10/vkCreatePipelineLayout device layout-ci nil lp)]
+                              (when (not= r VK10/VK_SUCCESS)
+                                (throw (RuntimeException. (str "vkCreatePipelineLayout failed: " r))))
+                              (let [layout (.get lp 0)
+
+                                    ;; ---- graphics pipeline ----
+                                    pci (VkGraphicsPipelineCreateInfo/calloc stack)]
+                                (.sType pci VK10/VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO)
+                                (.stageCount pci 2)
+                                (.pStages pci stages)
+                                (.pVertexInputState pci vi)
+                                (.pInputAssemblyState pci ia)
+                                (.pViewportState pci vps)
+                                (.pRasterizationState pci rast)
+                                (.pMultisampleState pci ms)
+                                (.pDepthStencilState pci nil)
+                                (.pColorBlendState pci cb)
+                                (.pDynamicState pci dyn)
+                                (.layout pci layout)
+                                (.renderPass pci (long render-pass))
+                                (.subpass pci 0)
+                                (.basePipelineHandle pci VK10/VK_NULL_HANDLE)
+                                (.basePipelineIndex pci -1)
+
+                                (let [pci-buf (VkGraphicsPipelineCreateInfo/create (.address pci) 1)
+                                      _ (.rewind lp)
+                                      r (VK10/vkCreateGraphicsPipelines device VK10/VK_NULL_HANDLE pci-buf nil lp)]
+                                  (when (not= r VK10/VK_SUCCESS)
+                                    (VK10/vkDestroyPipelineLayout device layout nil)
+                                    (throw (RuntimeException. (str "vkCreateGraphicsPipelines failed: " r))))
+                                  (let [pipeline (.get lp 0)]
+                                    (log/log "pipeline/build! OK pipeline=" pipeline "layout=" layout)
+                                    {:pipeline pipeline
+                                     :layout   layout
+                                     :device   device})))))))))))))))
+      (finally
+        (VK10/vkDestroyShaderModule device vert-mod nil)
+        (VK10/vkDestroyShaderModule device frag-mod nil)
+        (MemoryStack/stackPop)))))
 
 ;; ---------------------------------------------------------------------------
 ;; destroy!
 ;; ---------------------------------------------------------------------------
-(defn destroy!
-  "Destroy the pipeline and its layout.
-   pipeline-map — the map returned by build!"
-  [{:keys [^VkDevice device pipeline layout]}]
+(defn destroy! [{:keys [^VkDevice device pipeline layout]}]
   (when (and device pipeline layout)
-    (VK10/vkDestroyPipeline       device pipeline nil)
-    (VK10/vkDestroyPipelineLayout device layout   nil)))
+    (VK10/vkDestroyPipeline       device (long pipeline) nil)
+    (VK10/vkDestroyPipelineLayout device (long layout)   nil)))
