@@ -75,6 +75,15 @@ test: ## Run tests
 run/hello: shaders/hello
 	$(DISPLAY_PREFIX) lein hello
 
+# EDN-driven game runner. Usage: make run/edn EDN=examples/hello/game.edn
+EDN ?= examples/hello/game.edn
+.PHONY: run/edn
+run/edn: shaders/hello
+	$(DISPLAY_PREFIX) lein edn $(EDN)
+
+.PHONY: edn
+edn: run/edn ## Run a game from an EDN file (EDN=path/to/game.edn)
+
 # screenrecord — capture the cage window to a file.
 # Requires cage and wf-recorder (wlroots-based screen capture for cage's Wayland compositor).
 # Requires LIBSEAT_BACKEND=seatd (seatd must be running) for headless/SSH use.
