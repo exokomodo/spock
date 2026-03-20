@@ -51,12 +51,12 @@
   (let [n    (int sides)
         step (/ (* 2.0 Math/PI) n)]
     (float-array
-     (for [i (range n)
-           coord [:x :y]]
-       (let [angle (* i step)]
-         (case coord
-           :x (* (double radius) (Math/cos angle))
-           :y (* (double radius) (- (Math/sin angle)))))))))   ; flip Y for Vulkan
+     (mapcat
+      (fn [i]
+        (let [angle (* i step)]
+          [(* (double radius) (Math/cos angle))
+           (* (double radius) (- (Math/sin angle)))]))  ; flip Y for Vulkan
+      (range n)))))
 
 ;; ---------------------------------------------------------------------------
 ;; GPU memory helpers
