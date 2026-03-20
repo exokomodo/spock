@@ -6,17 +6,19 @@
 
 (defn compile-glsl
   "Invoke glslc to compile a GLSL source file to SPIR-V.
-   Returns true on success, false on failure.
-   Output is written to <source-path>.spv."
+   Returns true on success, throws RuntimeException with compiler output on failure.
+   Output .spv is written alongside the source file."
   [source-path]
   (let [spv-path (str source-path ".spv")
-        result   (-> (ProcessBuilder. ["glslc" source-path "-o" spv-path])
+        proc     (-> (ProcessBuilder. ["glslc" source-path "-o" spv-path])
                      (.redirectErrorStream true)
-                     (.start)
-                     (.waitFor))]
+                     (.start))
+        output   (slurp (.getInputStream proc))
+        result   (.waitFor proc)]
     (when (not= result 0)
-      (println (str "[spock.shader] Failed to compile: " source-path)))
-    (= result 0)))
+      (throw (RuntimeException.
+               (str "glslc failed for " source-path ":\n" output))))
+    true))
 
 (defn load-spirv
   "Load a compiled SPIR-V (.spv) file.
