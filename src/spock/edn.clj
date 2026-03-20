@@ -116,11 +116,9 @@
 
 (defn- post-init-component!
   "Any per-component work that requires a fully-initialised renderer.
-   Currently only :renderable/:triangle needs pipeline building."
+   Renderables that need pipeline building carry :pipeline-atom in their meta."
   [k v renderer]
   (when (and (= k :renderable)
-             (= :triangle (:type (meta v)))
-             ;; reify instances from make-triangle-renderable carry pipeline meta
              (contains? (meta v) :pipeline-atom))
     (build-triangle-pipeline! v renderer)))
 
