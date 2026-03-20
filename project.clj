@@ -33,7 +33,10 @@
   :profiles
   {:hello {:main hello.core
            :aot [hello.core]
-           :source-paths ["src" "examples"]}}
+           :source-paths ["src" "examples"]
+           ;; macOS requires GLFW on the first thread of the process.
+           ;; Linux doesn't need this but it's harmless.
+           :jvm-opts ["-XstartOnFirstThread"]}}
 
   :aliases
   {"hello" ["with-profile" "hello" "run"]})
