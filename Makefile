@@ -138,11 +138,6 @@ test: ## Run tests
 
 ##@ Examples
 
-EDN ?= examples/hello/game.edn
-.PHONY: run/edn
-run/edn: shaders/hello ## EDN-driven game runner. Usage: make run/edn EDN=examples/hello/game.edn
-	$(DISPLAY_PREFIX) lein edn $(EDN)
-
 .PHONY: run/hello
 run/hello: build/shaders ## Run the hello example
 	$(DISPLAY_PREFIX) lein hello
@@ -150,9 +145,6 @@ run/hello: build/shaders ## Run the hello example
 .PHONY: run/spin-shooter
 run/spin-shooter: build/shaders ## Run the spin-shooter example
 	$(DISPLAY_PREFIX) lein spin-shooter
-
-.PHONY: edn
-edn: run/edn ## Run a game from an EDN file (EDN=path/to/game.edn)
 
 ##@ Utilities
 
