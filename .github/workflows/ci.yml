@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5.2.0
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Leiningen
+        uses: ./.github/actions/setup-lein
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            glslc \
+            libvulkan1 \
+            vulkan-tools \
+            mesa-vulkan-drivers \
+            libgl1-mesa-dri \
+            xvfb
+
+      - name: Install project dependencies
+        run: |
+          make deps
+
+      - name: Compile (syntax check)
+        run: |
+          make check
+
+      - name: Compile shaders
+        run: |
+          make shaders/hello
+          make shaders/polygon
+
+      - name: Run tests
+        run: |
+          make test
+
+      - name: Verify Vulkan (lavapipe)
+        run: |
+          echo "--- ICD files ---"
+          find /usr/share/vulkan/icd.d/ -name "*.json" 2>/dev/null || echo "(none found)"
+          LVP_ICD=$(find /usr/share/vulkan/icd.d/ -name "lvp_icd*.json" | head -1)
+          if [ -z "$LVP_ICD" ]; then
+            echo "ERROR: no lavapipe ICD found" >&2
+            exit 1
+          fi
+          echo "Using ICD: $LVP_ICD"
+          VK_ICD_FILENAMES=$LVP_ICD vulkaninfo --summary 2>&1 | head -20 || true
+
+      - name: Run hello example headlessly (auto-closes after 5 s)
+        run: |
+          LVP_ICD=$(find /usr/share/vulkan/icd.d/ -name "lvp_icd*.json" | head -1)
+          Xvfb :99 -screen 0 1280x720x24 &
+          XVFB_PID=$!
+          sleep 1
+          DISPLAY=:99 \
+          VK_ICD_FILENAMES=$LVP_ICD \
+          LIBGL_ALWAYS_SOFTWARE=1 \
+          timeout 30 lein with-profile edn run -- examples/hello/game.edn
+          EXIT=$?
+          kill $XVFB_PID 2>/dev/null || true
+          exit $EXIT
