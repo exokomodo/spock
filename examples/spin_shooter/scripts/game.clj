@@ -10,6 +10,7 @@
             [spock.renderable.polygon :as polygon]
             [spock.input.core :as input]
             [spock.renderer.core :as renderer]
+            [spock.audio.core :as audio]
             [spock.log    :as log]))
 
 ;; ---------------------------------------------------------------------------
@@ -43,7 +44,10 @@
          :score       0
          :spawn-timer 0.0
          :spawn-interval SPAWN-INTERVAL-BASE
-         :elapsed     0.0}))
+         :elapsed     0.0
+         ;; Sound buffer ids (loaded in on-init)
+         :sound/shoot    nil
+         :sound/hit      nil}))
 
 ;; ---------------------------------------------------------------------------
 ;; Helpers
@@ -89,15 +93,27 @@
 
 (defn on-init [game sc shared-state]
   (log/log "spin-shooter game on-init")
-  ;; Reset local state with fresh gun layout
-  (reset! state {:planet      {:angle 0.0}
-                 :guns        (gun-angles 3 0.0)
-                 :bullets     []
-                 :enemies     []
-                 :score       0
-                 :spawn-timer 0.0
-                 :spawn-interval SPAWN-INTERVAL-BASE
-                 :elapsed     0.0})
+  ;; Load sound assets
+  (let [base-dir "examples/spin_shooter/audio"
+        shoot-id (try (audio/load-sound! (str base-dir "/shoot.wav"))
+                      (catch Exception e
+                        (log/warn "audio: could not load shoot.wav:" (.getMessage e))
+                        nil))
+        hit-id   (try (audio/load-sound! (str base-dir "/hit.wav"))
+                      (catch Exception e
+                        (log/warn "audio: could not load hit.wav:" (.getMessage e))
+                        nil))]
+    ;; Reset local state with fresh gun layout + loaded sound ids
+    (reset! state {:planet      {:angle 0.0}
+                   :guns        (gun-angles 3 0.0)
+                   :bullets     []
+                   :enemies     []
+                   :score       0
+                   :spawn-timer 0.0
+                   :spawn-interval SPAWN-INTERVAL-BASE
+                   :elapsed     0.0
+                   :sound/shoot shoot-id
+                   :sound/hit   hit-id}))
   ;; Sync score from shared-state (0 on first load)
   (swap! state assoc :score (or (:score @shared-state) 0)))
 
@@ -127,6 +143,8 @@
     ;; --- Input: fire ---
     (when (or (input/key-pressed? :space)
               (input/mouse-pressed? 0))
+      (when-let [snd (:sound/shoot @state)]
+        (audio/play! snd))
       (swap! state
              (fn [s]
                (let [new-bullets
@@ -222,6 +240,11 @@
                                       enemies-final)
 
                    new-score (+ (:score s) @score-gain)]
+
+               ;; Play hit sound for each enemy destroyed
+               (when (pos? @score-gain)
+                 (when-let [snd (:sound/hit s)]
+                   (audio/play! snd)))
 
                ;; Planet hit → request scene swap (after state is updated)
                (when planet-hit?
