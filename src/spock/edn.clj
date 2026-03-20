@@ -423,7 +423,7 @@
         entities (mapv #(load-entity % renderer base-dir) ent-cfgs)]
     (doseq [ent entities]
       (post-init-entity! ent renderer))
-    (scene/make scene-id scene-path entities (:script scene-data))))
+    (scene/make scene-id scene-path entities (:script scene-data) (:cfg scene-data {}))))
 
 ;; ---------------------------------------------------------------------------
 ;; Scene registry

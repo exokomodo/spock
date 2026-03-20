@@ -1,5 +1,7 @@
 {:script spin-shooter.scripts.gameover
 
- ;; Minimal scene — just text implied by reddish clear color.
- ;; R key restarts.
+ ;; Automatically close the game after this many seconds.
+ ;; 0 = stay open indefinitely (useful for real deployments).
+ :auto-close-secs 5
+
  :entities []}
