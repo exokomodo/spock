@@ -17,7 +17,7 @@
         result   (.waitFor proc)]
     (when (not= result 0)
       (throw (RuntimeException.
-               (str "glslc failed for " source-path ":\n" output))))
+              (str "glslc failed for " source-path ":\n" output))))
     true))
 
 (defn load-spirv

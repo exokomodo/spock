@@ -82,6 +82,7 @@ check/compile: ## Check code quality
 
 .PHONY: check/format
 check/format: ## Check code formatting with cljfmt
+	lein cljfmt check
 
 .PHONY: clean
 clean: ## Clean the project

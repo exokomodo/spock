@@ -73,11 +73,11 @@
   (GLFW/glfwWindowHint GLFW/GLFW_CLIENT_API GLFW/GLFW_NO_API)
   (GLFW/glfwWindowHint GLFW/GLFW_RESIZABLE  GLFW/GLFW_FALSE)
   (let [window (GLFW/glfwCreateWindow
-                 (int (:width game))
-                 (int (:height game))
-                 ^String (:title game)
-                 MemoryUtil/NULL
-                 MemoryUtil/NULL)]
+                (int (:width game))
+                (int (:height game))
+                ^String (:title game)
+                MemoryUtil/NULL
+                MemoryUtil/NULL)]
     (when (= window MemoryUtil/NULL)
       (throw (RuntimeException. "Failed to create GLFW window")))
     ;; Register generic input callbacks (key + mouse button + cursor position).
@@ -134,8 +134,8 @@
         ready-p (promise)
         error-p (promise)
         render-t (Thread.
-                   ^Runnable (fn [] (render-thread-fn game ready-p stop? error-p))
-                   "spock-render")]
+                  ^Runnable (fn [] (render-thread-fn game ready-p stop? error-p))
+                  "spock-render")]
     (try
       (renderer/create-surface! r window)
       (.start render-t)

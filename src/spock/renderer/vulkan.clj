@@ -23,8 +23,7 @@
             VkSubmitInfo VkPresentInfoKHR
             VkClearValue VkOffset2D VkExtent2D VkViewport VkRect2D
             KHRSurface KHRSwapchain]
-           [org.lwjgl.glfw GLFW GLFWVulkan])
-)
+           [org.lwjgl.glfw GLFW GLFWVulkan]))
 
 ;; ---------------------------------------------------------------------------
 ;; Constants
@@ -121,10 +120,10 @@
   (let [^MemoryStack stack (MemoryStack/stackPush)
         lp  (.mallocLong stack 1)]
     (vk-check (GLFWVulkan/glfwCreateWindowSurface
-                ^VkInstance (:instance @state)
-                (long (:window-handle @state))
-                nil lp)
-               "glfwCreateWindowSurface failed")
+               ^VkInstance (:instance @state)
+               (long (:window-handle @state))
+               nil lp)
+              "glfwCreateWindowSurface failed")
     (let [s (.get lp 0)]
       (swap! state assoc :surface s)
       (MemoryStack/stackPop)
@@ -144,19 +143,19 @@
         _   (VK10/vkGetPhysicalDeviceQueueFamilyProperties pd ip buf)
         pb  (.mallocInt stack 1)
         res (reduce
-              (fn [acc ^long i]
-                (let [^VkQueueFamilyProperties p (.get buf (int i))
-                      gfx?  (not= 0 (bit-and (.queueFlags p) VK10/VK_QUEUE_GRAPHICS_BIT))
-                      _     (KHRSurface/vkGetPhysicalDeviceSurfaceSupportKHR pd i surface pb)
-                      pres? (= 1 (.get pb 0))
-                      acc'  (cond-> acc
-                              gfx?  (assoc :graphics-family (int i))
-                              pres? (assoc :present-family  (int i)))]
-                  (if (and (:graphics-family acc') (:present-family acc'))
-                    (reduced acc')
-                    acc')))
-              {}
-              (range cnt))]
+             (fn [acc ^long i]
+               (let [^VkQueueFamilyProperties p (.get buf (int i))
+                     gfx?  (not= 0 (bit-and (.queueFlags p) VK10/VK_QUEUE_GRAPHICS_BIT))
+                     _     (KHRSurface/vkGetPhysicalDeviceSurfaceSupportKHR pd i surface pb)
+                     pres? (= 1 (.get pb 0))
+                     acc'  (cond-> acc
+                             gfx?  (assoc :graphics-family (int i))
+                             pres? (assoc :present-family  (int i)))]
+                 (if (and (:graphics-family acc') (:present-family acc'))
+                   (reduced acc')
+                   acc')))
+             {}
+             (range cnt))]
     (MemoryStack/stackPop)
     res))
 
@@ -191,15 +190,15 @@
         gf   (int (:graphics-family @state))
         pf   (int (:present-family @state))
         uq   (distinct [gf pf])
-  prio (doto (.mallocFloat stack 1) (.put 1.0) (.flip))
+        prio (doto (.mallocFloat stack 1) (.put 1.0) (.flip))
         qcis (VkDeviceQueueCreateInfo/callocStack (count uq) stack)
         _    (dorun (map-indexed
-                      (fn [idx fam]
-                        (doto ^VkDeviceQueueCreateInfo (.get qcis (int idx))
-                          (.sType VK10/VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
-                          (.queueFamilyIndex (int fam))
-                          (.pQueuePriorities prio)))
-                      uq))
+                     (fn [idx fam]
+                       (doto ^VkDeviceQueueCreateInfo (.get qcis (int idx))
+                         (.sType VK10/VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
+                         (.queueFamilyIndex (int fam))
+                         (.pQueuePriorities prio)))
+                     uq))
         feat (VkPhysicalDeviceFeatures/calloc stack)
         exts (strings->pp stack DEVICE-EXTENSIONS)
         ci   (doto (VkDeviceCreateInfo/calloc stack)
@@ -209,7 +208,7 @@
                (.ppEnabledExtensionNames exts))
         pp   (.mallocPointer stack 1)
         _    (vk-check (VK10/vkCreateDevice ^VkPhysicalDevice (:physical-device @state) ci nil pp)
-                        "vkCreateDevice failed")
+                       "vkCreateDevice failed")
         dev  (VkDevice. (.get pp 0) ^VkPhysicalDevice (:physical-device @state) ci)
         gqp  (.mallocPointer stack 1)
         pqp  (.mallocPointer stack 1)
@@ -298,7 +297,7 @@
                     (.pQueueFamilyIndices qfb))))
         lp    (.mallocLong stack 1)
         _     (vk-check (KHRSwapchain/vkCreateSwapchainKHR dev ci nil lp)
-                         "vkCreateSwapchainKHR failed")
+                        "vkCreateSwapchainKHR failed")
         sc    (.get lp 0)
         _     (KHRSwapchain/vkGetSwapchainImagesKHR dev sc ip nil)
         ib    (.mallocLong stack (.get ip 0))
@@ -339,7 +338,7 @@
                           (.layerCount 1))
                         (.rewind lp)
                         (vk-check (VK10/vkCreateImageView dev ci nil lp)
-                                   "vkCreateImageView failed")
+                                  "vkCreateImageView failed")
                         (.get lp 0)))
                     (:swapchain-images @state))]
     (swap! state assoc :swapchain-views views)
@@ -356,33 +355,33 @@
         att  (doto (VkAttachmentDescription/callocStack 1 stack)
                (-> (.get 0)
                    (doto (.format fmt)
-                         (.samples VK10/VK_SAMPLE_COUNT_1_BIT)
-                         (.loadOp VK10/VK_ATTACHMENT_LOAD_OP_CLEAR)
-                         (.storeOp VK10/VK_ATTACHMENT_STORE_OP_STORE)
-                         (.stencilLoadOp VK10/VK_ATTACHMENT_LOAD_OP_DONT_CARE)
-                         (.stencilStoreOp VK10/VK_ATTACHMENT_STORE_OP_DONT_CARE)
-                         (.initialLayout VK10/VK_IMAGE_LAYOUT_UNDEFINED)
-                         (.finalLayout KHRSwapchain/VK_IMAGE_LAYOUT_PRESENT_SRC_KHR))))
+                     (.samples VK10/VK_SAMPLE_COUNT_1_BIT)
+                     (.loadOp VK10/VK_ATTACHMENT_LOAD_OP_CLEAR)
+                     (.storeOp VK10/VK_ATTACHMENT_STORE_OP_STORE)
+                     (.stencilLoadOp VK10/VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                     (.stencilStoreOp VK10/VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                     (.initialLayout VK10/VK_IMAGE_LAYOUT_UNDEFINED)
+                     (.finalLayout KHRSwapchain/VK_IMAGE_LAYOUT_PRESENT_SRC_KHR))))
         cref (doto (VkAttachmentReference/callocStack stack)
                (.attachment 0)
                (.layout VK10/VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))
         cref-buf (doto (VkAttachmentReference/callocStack 1 stack)
                    (-> (.get 0)
                        (doto (.attachment 0)
-                             (.layout VK10/VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))))
+                         (.layout VK10/VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))))
         sub  (doto (VkSubpassDescription/callocStack 1 stack)
                (-> (.get 0)
                    (doto (.pipelineBindPoint VK10/VK_PIPELINE_BIND_POINT_GRAPHICS)
-                         (.colorAttachmentCount 1)
-                         (.pColorAttachments cref-buf))))
+                     (.colorAttachmentCount 1)
+                     (.pColorAttachments cref-buf))))
         dep  (doto (VkSubpassDependency/callocStack 1 stack)
                (-> (.get 0)
                    (doto (.srcSubpass VK10/VK_SUBPASS_EXTERNAL)
-                         (.dstSubpass 0)
-                         (.srcStageMask VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                         (.srcAccessMask 0)
-                         (.dstStageMask VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                         (.dstAccessMask VK10/VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))))
+                     (.dstSubpass 0)
+                     (.srcStageMask VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                     (.srcAccessMask 0)
+                     (.dstStageMask VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                     (.dstAccessMask VK10/VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))))
         ci   (doto (VkRenderPassCreateInfo/calloc stack)
                (.sType VK10/VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
                (.pAttachments att)
@@ -416,7 +415,7 @@
                                 (.height (int (:height ext)))
                                 (.layers 1))]
                        (vk-check (VK10/vkCreateFramebuffer dev ci nil lp)
-                                  "vkCreateFramebuffer failed")
+                                 "vkCreateFramebuffer failed")
                        (.get lp 0)))
                    (:swapchain-views @state))]
     (swap! state assoc :framebuffers fbs)
@@ -448,7 +447,7 @@
              (.commandBufferCount MAX-FRAMES))
         pp (.mallocPointer stack MAX-FRAMES)
         _  (vk-check (VK10/vkAllocateCommandBuffers dev ai pp)
-                      "vkAllocateCommandBuffers failed")
+                     "vkAllocateCommandBuffers failed")
         cbs (mapv #(VkCommandBuffer. (.get pp (int %)) dev) (range MAX-FRAMES))]
     (swap! state assoc :command-buffers cbs)
     (MemoryStack/stackPop)
@@ -519,7 +518,7 @@
         sc   (doto (VkRect2D/calloc 1 stack)
                (-> (.get 0)
                    (doto (-> .offset (.set 0 0))
-                         (-> .extent (.set w h)))))
+                     (-> .extent (.set w h)))))
         _    (VK10/vkCmdSetViewport cb 0 vp)
         _    (VK10/vkCmdSetScissor  cb 0 sc)
         vkext (doto (VkExtent2D/malloc stack)
@@ -542,11 +541,11 @@
         ia-sem (long (nth (:image-available @state) frame))
         rf-sem (long (nth (:render-finished @state) frame))
         ^VkCommandBuffer cb (nth (:command-buffers @state) frame)
-  fl     (doto (.mallocLong stack 1) (.put fence) (.flip))
+        fl     (doto (.mallocLong stack 1) (.put fence) (.flip))
         ip     (.mallocInt stack 1)]
     (VK10/vkWaitForFences dev fl true Long/MAX_VALUE)
     (let [res (KHRSwapchain/vkAcquireNextImageKHR
-                dev (long (:swapchain @state)) Long/MAX_VALUE ia-sem VK_NULL ip)]
+               dev (long (:swapchain @state)) Long/MAX_VALUE ia-sem VK_NULL ip)]
       (when (= res KHRSwapchain/VK_ERROR_OUT_OF_DATE_KHR)
         (MemoryStack/stackPop)
         (throw (ex-info "Swapchain out of date" {:type :swapchain-recreate})))
@@ -554,11 +553,11 @@
         (VK10/vkResetFences dev fence)
         (VK10/vkResetCommandBuffer cb 0)
         (record-command-buffer! state cb img-idx renderables)
-          (let [ws  (doto (.mallocLong stack 1) (.put ia-sem) (.flip))
-            ss  (doto (.mallocLong stack 1) (.put rf-sem) (.flip))
+        (let [ws  (doto (.mallocLong stack 1) (.put ia-sem) (.flip))
+              ss  (doto (.mallocLong stack 1) (.put rf-sem) (.flip))
               wst (doto (.mallocInt  stack 1)
-              (.put VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) (.flip))
-            cbp (doto (.mallocPointer stack 1) (.put (.address cb)) (.flip))
+                    (.put VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) (.flip))
+              cbp (doto (.mallocPointer stack 1) (.put (.address cb)) (.flip))
               si  (doto (VkSubmitInfo/calloc stack)
                     (.sType VK10/VK_STRUCTURE_TYPE_SUBMIT_INFO)
                     (.waitSemaphoreCount 1)
@@ -567,9 +566,9 @@
                     (.pCommandBuffers cbp)
                     (.pSignalSemaphores ss))]
           (vk-check (VK10/vkQueueSubmit ^VkQueue (:graphics-queue @state) si fence)
-                     "vkQueueSubmit failed")
-            (let [scb (doto (.mallocLong stack 1) (.put (long (:swapchain @state))) (.flip))
-              iib (doto (.mallocInt  stack 1) (.put (int img-idx)) (.flip))
+                    "vkQueueSubmit failed")
+          (let [scb (doto (.mallocLong stack 1) (.put (long (:swapchain @state))) (.flip))
+                iib (doto (.mallocInt  stack 1) (.put (int img-idx)) (.flip))
                 pi  (doto (VkPresentInfoKHR/calloc stack)
                       (.sType KHRSwapchain/VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
                       (.pWaitSemaphores ss)
