@@ -6,7 +6,8 @@
             [spock.renderer.core   :as renderer]
             [spock.pipeline.core   :as pipeline]
             [spock.log             :as log])
-  (:import [org.lwjgl.vulkan VkCommandBuffer VK10])
+  (:import [org.lwjgl.glfw GLFW]
+           [org.lwjgl.vulkan VkCommandBuffer VK10])
   (:gen-class))
 
 ;; ---------------------------------------------------------------------------
@@ -79,7 +80,13 @@
     (log/log "on-init! done"))
 
   (on-tick! [_this delta]
-    (swap! dirs-atom #(update-clear-color! g delta %)))
+    (swap! dirs-atom #(update-clear-color! g delta %))
+    ;; Auto-close after 5 seconds.
+    (swap! (:state g) (fn [s]
+                        (let [t (+ (get s :elapsed 0.0) delta)]
+                          (when (>= t 5.0)
+                            (GLFW/glfwSetWindowShouldClose (:window s) true))
+                          (assoc s :elapsed t)))))
 
   (on-done! [_this]
     (log/log "on-done!")))

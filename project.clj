@@ -35,13 +35,15 @@
            :aot [hello.core]
            :source-paths ["src" "examples"]
            ;; macOS requires GLFW on the first thread of the process.
-           ;; Linux doesn't need this but it's harmless.
-           ;; LWJGL library path is set via JVM_OPTS in the Makefile on macOS;
-           ;; the property below is a no-op on Linux.
-           :jvm-opts ["-XstartOnFirstThread"
-                      ~(str "-Dorg.lwjgl.vulkan.libname="
-                            (or (System/getenv "VULKAN_LOADER")
-                                "/usr/local/lib/libvulkan.1.dylib"))]}}
+           ;; -XstartOnFirstThread is macOS-only and must NOT be passed on Linux
+           ;; (the JVM will refuse to start with an unrecognised option).
+           ;; LWJGL library path is set via JVM_OPTS / VULKAN_LOADER on macOS.
+           :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
+                        (= "Mac OS X" (System/getProperty "os.name"))
+                        (conj "-XstartOnFirstThread"
+                              (str "-Dorg.lwjgl.vulkan.libname="
+                                   (or (System/getenv "VULKAN_LOADER")
+                                       "/usr/local/lib/libvulkan.1.dylib"))))}}
 
 
 
