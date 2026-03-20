@@ -1,9 +1,5 @@
 {:title  "Hello Vulkan"
- :width  1280
- :height 720
-
- ;; Script namespace — contains on-init, on-tick, on-done
- :script hello.script
+ :script hello.scripts.hello
 
  :entities [{:id         :triangle
              :renderable {:type    :triangle

@@ -1,0 +1,5 @@
+{:entry    :hello
+ :settings "examples/hello/settings.edn"
+ :state    {}
+
+ :scenes [{:name :hello :file "examples/hello/scenes/hello.edn"}]}

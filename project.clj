@@ -33,7 +33,7 @@
   :profiles
   {:edn {:main spock.main
          :aot [spock.main]
-         :source-paths ["src" "examples"]
+         :source-paths ["src" "examples" "examples/hello/scripts"]
          :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
                       (= "Mac OS X" (System/getProperty "os.name"))
                       (conj "-XstartOnFirstThread"
@@ -42,5 +42,5 @@
                                      "/usr/local/lib/libvulkan.1.dylib"))))}}
 
   :aliases
-  {"hello"  ["with-profile" "edn" "run" "--" "examples/hello/scene.edn"]
+  {"hello"  ["with-profile" "edn" "run" "--" "examples/hello/game.edn"]
    "edn"    ["with-profile" "edn" "run" "--"]})

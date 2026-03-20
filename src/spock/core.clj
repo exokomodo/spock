@@ -1,29 +1,26 @@
 (ns spock.core
   "Top-level spock API.
 
-   (spock/load-game :edn \"game.edn\")  → [game lifecycle]
+   (spock/load-game \"game.edn\")   → [game lifecycle]  ; full game with registry
+   (spock/load-game \"scene.edn\")  → [game lifecycle]  ; bare scene, backward compat
    (game/start! game lifecycle)"
-  (:require [spock.edn :as edn-loader]))
+  (:require [spock.edn :as edn-loader]
+            [clojure.string :as str]))
 
-;; ---------------------------------------------------------------------------
-;; load-game multimethod — dispatch on format keyword
-;; ---------------------------------------------------------------------------
+(defn load-game
+  "Load a game or scene EDN file. Returns [game lifecycle].
+   Detects game.edn (has :entry or :scenes key) vs bare scene.edn automatically."
+  ([path]
+   (let [cfg (-> (slurp path) clojure.edn/read-string)]
+     (if (or (:entry cfg) (:scenes cfg))
+       (edn-loader/load-game path)
+       (edn-loader/load-bare-scene path))))
+  ([fmt path]
+   (case fmt
+     :edn  (load-game path)
+     :game (edn-loader/load-game path)
+     :scene (edn-loader/load-bare-scene path)
+     (throw (ex-info (str "Unknown format: " fmt) {:format fmt})))))
 
-(defmulti load-game
-  "Load a game definition from a file.
-   Returns [game lifecycle] ready to pass to game/start!.
-
-   Dispatch value is a format keyword:
-     :edn — EDN file with :title, :width, :height, :script, :entities"
-  (fn [fmt _path] fmt))
-
-(defmethod load-game :edn [_ path]
-  (edn-loader/load-game path))
-
-(defmethod load-game :default [fmt _path]
-  (throw (ex-info (str "Unknown game format: " fmt
-                       ". Supported: :edn")
-                  {:format fmt})))
-
-;; Re-export renderable registry so users only need to require spock.core
+;; Re-export renderable registry
 (def register-renderable! edn-loader/register-renderable!)
