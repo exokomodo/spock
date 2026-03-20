@@ -650,7 +650,10 @@
            (println "[VulkanRenderer] cleanup! failed:" (.getMessage e)))))
 
   (get-clear-color [_this] (:clear-color @state))
-  (set-clear-color! [_this color] (swap! state assoc :clear-color color)))
+  (set-clear-color! [_this color] (swap! state assoc :clear-color color))
+  (get-extent [_this] (:swapchain-extent @state))
+  (get-render-pass [_this] (:render-pass @state))
+  (get-device [_this] (:device @state)))
 
 (defn make-vulkan-renderer
   ([]          (make-vulkan-renderer "Spock"))

@@ -20,4 +20,10 @@
   (get-clear-color [this]
     "Return current clear color as [r g b a] floats.")
   (set-clear-color! [this color]
-    "Set the clear color. color is [r g b a]."))
+    "Set the clear color. color is [r g b a].")
+  (get-extent [this]
+    "Return the swapchain extent as {:width int :height int}.")
+  (get-render-pass [this]
+    "Return the VkRenderPass handle (long).")
+  (get-device [this]
+    "Return the VkDevice."))
