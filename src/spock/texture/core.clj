@@ -284,190 +284,124 @@
 
 (defn load-texture!
   "Load an image from path and upload it as a device-local VkImage texture.
-   renderer must implement spock.renderer.core/Renderer (get-device,
-   get-command-pool, get-graphics-queue).
-   Returns a texture map:
-     {:image        long
-      :image-memory long
-      :image-view   long
-      :sampler      long
-      :width        int
-      :height       int
-      :device       VkDevice}"
+   Returns {:image :image-memory :image-view :sampler :width :height :device}."
   [path renderer]
   (require 'spock.renderer.core)
-  (let [get-device        (resolve 'spock.renderer.core/get-device)
-        get-command-pool  (resolve 'spock.renderer.core/get-command-pool)
+  (let [get-device         (resolve 'spock.renderer.core/get-device)
+        get-command-pool   (resolve 'spock.renderer.core/get-command-pool)
         get-graphics-queue (resolve 'spock.renderer.core/get-graphics-queue)
-        ^VkDevice device      (get-device renderer)
-        ^long command-pool    (get-command-pool renderer)
-        ^VkQueue gfx-queue    (get-graphics-queue renderer)
-        ^VkPhysicalDevice pd  (.getPhysicalDevice device)]
-
+        ^VkDevice device       (get-device renderer)
+        ^long command-pool     (get-command-pool renderer)
+        ^VkQueue gfx-queue     (get-graphics-queue renderer)
+        ^VkPhysicalDevice pd   (.getPhysicalDevice device)]
     (log/info "load-texture! loading:" path)
-    (println "[texture] A - before ImageIO/read")
     (let [^BufferedImage bi (ImageIO/read (File. ^String path))]
-      (println "[texture] B - image read, nil?" (nil? bi))
       (when-not bi (throw (RuntimeException. (str "Failed to load image: " path))))
-      (println "[texture] C - starting pixel conversion"))
-    ;; --- Load image pixels via Java2D ---
-    (let [^BufferedImage bi (ImageIO/read (File. ^String path))]
-      (when-not bi
-        (throw (RuntimeException. (str "Failed to load image: " path))))
-      (let [width  (.getWidth bi)
-            height (.getHeight bi)
-            ;; Convert to RGBA (4 bytes/pixel) regardless of source format
+      (let [width    (.getWidth bi)
+            height   (.getHeight bi)
+            img-size (int (* width height 4))
+            ;; Convert to RGBA via Java2D
             rgba-img (doto (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
-                       (-> .getGraphics
-                           (doto (.drawImage bi 0 0 nil)
-                             (.dispose))))
-            img-size (* width height 4)
-
-            ;; Extract ARGB int array and convert to RGBA byte order for Vulkan
-            pixels    (int-array (* width height))
-            _         (.getRGB rgba-img 0 0 width height pixels 0 width)
-            pixel-buf (MemoryUtil/memAlloc (int img-size))
-            _         (let [n   (alength pixels)
-                            arr (byte-array img-size)]
-                        (loop [i 0 j 0]
-                          (when (< i n)
-                            (let [px (aget pixels i)]
-                              (aset arr j       (byte (bit-and (bit-shift-right px 16) 0xFF)))
-                              (aset arr (+ j 1) (byte (bit-and (bit-shift-right px  8) 0xFF)))
-                              (aset arr (+ j 2) (byte (bit-and px 0xFF)))
-                              (aset arr (+ j 3) (byte (bit-and (unsigned-bit-shift-right px 24) 0xFF))))
-                            (recur (inc i) (+ j 4))))
-                        (.put pixel-buf arr)
-                        (.flip pixel-buf)
-                        (println "[texture] E - pixel conversion done"))
-
-            ;; --- Staging buffer ---
+                       (-> .getGraphics (doto (.drawImage bi 0 0 nil) .dispose)))
+            pixels   (int-array (* width height))
+            _        (.getRGB rgba-img 0 0 width height pixels 0 width)
+            ;; Build RGBA byte array
+            rgb-arr  (byte-array img-size)
+            _        (let [n (alength pixels)]
+                       (loop [i 0 j 0]
+                         (when (< i n)
+                           (let [px (aget pixels i)]
+                             (aset rgb-arr j       (byte (bit-and (bit-shift-right px 16) 0xFF)))
+                             (aset rgb-arr (+ j 1) (byte (bit-and (bit-shift-right px  8) 0xFF)))
+                             (aset rgb-arr (+ j 2) (byte (bit-and px 0xFF)))
+                             (aset rgb-arr (+ j 3) (byte (bit-and (unsigned-bit-shift-right px 24) 0xFF))))
+                           (recur (inc i) (+ j 4)))))
+            ;; Staging buffer
             staging-host-props (bit-or VK10/VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                        VK10/VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-            staging-usage      (bit-or VK10/VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
-            _         (println "[texture] F - creating staging buffer")
-            {:keys [buffer staging-memory]}
-            (let [sb (create-buffer! device pd img-size staging-usage staging-host-props)]
-              (println "[texture] G - staging buffer created")
-              {:buffer (:buffer sb) :staging-memory (:memory sb)})
-
-            ;; Map and copy pixel data into staging buffer
-            _  (let [stack (MemoryStack/stackPush)]
-                 (try
-                   (let [pp (.mallocPointer stack 1)]
-                     (VK10/vkMapMemory device staging-memory 0 (long img-size) 0 pp)
-                     (let [dst (MemoryUtil/memByteBuffer (.get pp 0) (int img-size))]
-                       (.rewind pixel-buf)
-                       (.put dst pixel-buf))
-                     (VK10/vkUnmapMemory device staging-memory))
-                   (finally
-                     (MemoryStack/stackPop))))
-            _  (do (println "[texture] H - map/copy done") (MemoryUtil/memFree pixel-buf))
-
-            ;; --- Device-local image ---
+            sb       (create-buffer! device pd img-size
+                                     VK10/VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+                                     staging-host-props)
+            stg-buf  (:buffer sb)
+            stg-mem  (:memory sb)
+            ;; Map staging memory and copy pixels
+            _        (let [stack (MemoryStack/stackPush)]
+                       (try
+                         (let [pp  (.mallocPointer stack 1)
+                               _   (VK10/vkMapMemory device stg-mem 0 (long img-size) 0 pp)
+                               dst (MemoryUtil/memByteBuffer (.get pp 0) img-size)]
+                           (.put dst rgb-arr)
+                           (VK10/vkUnmapMemory device stg-mem))
+                         (finally (MemoryStack/stackPop))))
+            ;; Device-local image
             VK_FORMAT_R8G8B8A8_SRGB 43
-            image-usage (bit-or VK10/VK_IMAGE_USAGE_TRANSFER_DST_BIT
-                                VK10/VK_IMAGE_USAGE_SAMPLED_BIT)
-            _           (println "[texture] I - creating device image")
-            {:keys [image image-memory]}
-            (create-image! device pd width height
-                           VK_FORMAT_R8G8B8A8_SRGB
-                           VK10/VK_IMAGE_TILING_OPTIMAL
-                           image-usage
-                           VK10/VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-            _           (println "[texture] J - image created, beginning cmd buffer")
-
-            ;; --- Upload via one-shot command buffer ---
-            cb (begin-single-time-commands! device command-pool)]
-
-        (println "[texture] K - recording transitions")
-        ;; Transition: UNDEFINED → TRANSFER_DST_OPTIMAL
+            img-map  (create-image! device pd width height
+                                    VK_FORMAT_R8G8B8A8_SRGB
+                                    VK10/VK_IMAGE_TILING_OPTIMAL
+                                    (bit-or VK10/VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                                            VK10/VK_IMAGE_USAGE_SAMPLED_BIT)
+                                    VK10/VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+            image     (:image img-map)
+            img-mem   (:image-memory img-map)
+            cb        (begin-single-time-commands! device command-pool)]
+        ;; Record: UNDEFINED → TRANSFER_DST, copy, TRANSFER_DST → SHADER_READ
         (transition-image-layout! cb image
                                   VK10/VK_IMAGE_LAYOUT_UNDEFINED
                                   VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
-        (println "[texture] L - copy buffer to image")
-        ;; Copy buffer → image
-        (copy-buffer-to-image! cb buffer image width height)
-        (println "[texture] M - final transition")
-        ;; Transition: TRANSFER_DST_OPTIMAL → SHADER_READ_ONLY_OPTIMAL
+        (copy-buffer-to-image! cb stg-buf image width height)
         (transition-image-layout! cb image
                                   VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
                                   VK10/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-
-        (println "[texture] N - submitting queue")
         (end-single-time-commands! device command-pool cb gfx-queue)
-        (println "[texture] O - done")
-
-        ;; Free staging buffer
-        (VK10/vkDestroyBuffer device buffer nil)
-        (VK10/vkFreeMemory    device staging-memory nil)
-
-        ;; --- Image view ---
-        (let [VK_FORMAT_R8G8B8A8_SRGB 43
-              image-view
-              (let [stack (MemoryStack/stackPush)]
-                (try
-                  (let [vci (doto (VkImageViewCreateInfo/calloc stack)
-                              (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
-                              (.image image)
-                              (.viewType VK10/VK_IMAGE_VIEW_TYPE_2D)
-                              (.format VK_FORMAT_R8G8B8A8_SRGB))
-                        _   (doto (.components vci)
-                              (.r VK10/VK_COMPONENT_SWIZZLE_IDENTITY)
-                              (.g VK10/VK_COMPONENT_SWIZZLE_IDENTITY)
-                              (.b VK10/VK_COMPONENT_SWIZZLE_IDENTITY)
-                              (.a VK10/VK_COMPONENT_SWIZZLE_IDENTITY))
-                        _   (doto (.subresourceRange vci)
-                              (.aspectMask VK10/VK_IMAGE_ASPECT_COLOR_BIT)
-                              (.baseMipLevel 0)
-                              (.levelCount 1)
-                              (.baseArrayLayer 0)
-                              (.layerCount 1))
-                        lp  (.mallocLong stack 1)
-                        r   (VK10/vkCreateImageView device vci nil lp)]
-                    (when (not= r VK10/VK_SUCCESS)
-                      (throw (RuntimeException. (str "vkCreateImageView (texture) failed: " r))))
-                    (.get lp 0))
-                  (finally
-                    (MemoryStack/stackPop))))
-
-              ;; --- Sampler ---
-              sampler
-              (let [stack (MemoryStack/stackPush)]
-                (try
-                  (let [sci (doto (VkSamplerCreateInfo/calloc stack)
-                              (.sType VK10/VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO)
-                              (.magFilter VK10/VK_FILTER_LINEAR)
-                              (.minFilter VK10/VK_FILTER_LINEAR)
-                              (.addressModeU VK10/VK_SAMPLER_ADDRESS_MODE_REPEAT)
-                              (.addressModeV VK10/VK_SAMPLER_ADDRESS_MODE_REPEAT)
-                              (.addressModeW VK10/VK_SAMPLER_ADDRESS_MODE_REPEAT)
-                              (.anisotropyEnable false)
-                              (.maxAnisotropy 1.0)
-                              (.borderColor VK10/VK_BORDER_COLOR_INT_OPAQUE_BLACK)
-                              (.unnormalizedCoordinates false)
-                              (.compareEnable false)
-                              (.compareOp VK10/VK_COMPARE_OP_ALWAYS)
-                              (.mipmapMode VK10/VK_SAMPLER_MIPMAP_MODE_LINEAR)
-                              (.mipLodBias 0.0)
-                              (.minLod 0.0)
-                              (.maxLod 0.0))
-                        lp  (.mallocLong stack 1)
-                        r   (VK10/vkCreateSampler device sci nil lp)]
-                    (when (not= r VK10/VK_SUCCESS)
-                      (throw (RuntimeException. (str "vkCreateSampler failed: " r))))
-                    (.get lp 0))
-                  (finally
-                    (MemoryStack/stackPop))))]
-
-          (log/info "load-texture! OK width=" width "height=" height)
-          {:image        image
-           :image-memory image-memory
-           :image-view   image-view
-           :sampler      sampler
-           :width        width
-           :height       height
-           :device       device})))))
+        ;; Free staging
+        (VK10/vkDestroyBuffer device stg-buf nil)
+        (VK10/vkFreeMemory    device stg-mem nil)
+        ;; Image view
+        (let [VK_IMAGE_ASPECT_COLOR_BIT 1
+              ivc (doto (VkImageViewCreateInfo/calloc (MemoryStack/stackGet))
+                    (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
+                    (.image (long image))
+                    (.viewType VK10/VK_IMAGE_VIEW_TYPE_2D)
+                    (.format (int VK_FORMAT_R8G8B8A8_SRGB))
+                    (-> .subresourceRange
+                        (doto (.aspectMask VK_IMAGE_ASPECT_COLOR_BIT)
+                          (.baseMipLevel 0)
+                          (.levelCount 1)
+                          (.baseArrayLayer 0)
+                          (.layerCount 1))))
+              stack  (MemoryStack/stackPush)
+              lp     (.mallocLong stack 1)
+              r      (VK10/vkCreateImageView device ivc nil lp)]
+          (when (not= r VK10/VK_SUCCESS)
+            (throw (RuntimeException. (str "vkCreateImageView failed: " r))))
+          (let [image-view (.get lp 0)
+                ;; Sampler
+                sc  (doto (VkSamplerCreateInfo/calloc stack)
+                      (.sType VK10/VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO)
+                      (.magFilter VK10/VK_FILTER_LINEAR)
+                      (.minFilter VK10/VK_FILTER_LINEAR)
+                      (.addressModeU VK10/VK_SAMPLER_ADDRESS_MODE_REPEAT)
+                      (.addressModeV VK10/VK_SAMPLER_ADDRESS_MODE_REPEAT)
+                      (.addressModeW VK10/VK_SAMPLER_ADDRESS_MODE_REPEAT)
+                      (.anisotropyEnable false)
+                      (.maxAnisotropy 1.0)
+                      (.borderColor VK10/VK_BORDER_COLOR_INT_OPAQUE_BLACK)
+                      (.unnormalizedCoordinates false)
+                      (.compareEnable false)
+                      (.compareOp VK10/VK_COMPARE_OP_ALWAYS)
+                      (.mipmapMode VK10/VK_SAMPLER_MIPMAP_MODE_LINEAR))
+                r2  (VK10/vkCreateSampler device sc nil lp)]
+            (when (not= r2 VK10/VK_SUCCESS)
+              (throw (RuntimeException. (str "vkCreateSampler failed: " r2))))
+            (MemoryStack/stackPop)
+            (log/info "load-texture! done:" path width "x" height)
+            {:image        (long image)
+             :image-memory (long img-mem)
+             :image-view   (long image-view)
+             :sampler      (.get lp 0)
+             :width        width
+             :height       height
+             :device       device}))))))
 
 (defn destroy-texture!
   "Free all Vulkan resources associated with a texture map."
