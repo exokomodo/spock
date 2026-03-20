@@ -79,12 +79,12 @@
                   (if (and pipeline layout)
                     (do
                       (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
-                        ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-                        org.lwjgl.vulkan.VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
-                        (long pipeline))
+                       ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                       org.lwjgl.vulkan.VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
+                       (long pipeline))
                       (org.lwjgl.vulkan.VK10/vkCmdDraw
-                        ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-                        3 1 0 0))
+                       ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                       3 1 0 0))
                     (log/trace "edn :triangle draw: no pipeline yet"))))
               (cleanup! [_this _device]
                 (pipeline/destroy! @pipeline-atom)
@@ -130,12 +130,12 @@
   (let [n (int sides)
         step (/ (* 2.0 Math/PI) n)]
     (float-array
-      (for [i (range n)
-            coord [:x :y]]
-        (let [angle (* i step)]
-          (case coord
-            :x (* (double radius) (Math/cos angle))
-            :y (* (double radius) (- (Math/sin angle)))))))))  ; flip Y for Vulkan
+     (for [i (range n)
+           coord [:x :y]]
+       (let [angle (* i step)]
+         (case coord
+           :x (* (double radius) (Math/cos angle))
+           :y (* (double radius) (- (Math/sin angle)))))))))  ; flip Y for Vulkan
 
 ;; Physical device is needed to find memory types. Accept it explicitly.
 (defn- find-memory-type
@@ -232,9 +232,9 @@
                 (when (and pl vb)
                   (let [{:keys [pipeline layout]} pl]
                     (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
-                      ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-                      VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
-                      (long pipeline))
+                     ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                     VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
+                     (long pipeline))
                     ;; Bind vertex buffer at binding 0
                     (let [stack (org.lwjgl.system.MemoryStack/stackPush)
                           vbp   (doto (.mallocLong stack 1) (.put (:buffer vb)) (.flip))
@@ -257,13 +257,13 @@
                           (.putFloat pc-buf (float (nth c 3 1.0)))     ; color.a
                           (.flip pc-buf)
                           (pipeline/push-constants!
-                            command-buffer
-                            (long layout)
-                            VK10/VK_SHADER_STAGE_VERTEX_BIT
-                            pc-buf))
+                           command-buffer
+                           (long layout)
+                           VK10/VK_SHADER_STAGE_VERTEX_BIT
+                           pc-buf))
                         (VK10/vkCmdDraw
-                          ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-                          (int sides) 1 0 0)))))))
+                         ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                         (int sides) 1 0 0)))))))
             (cleanup! [_this device]
               (when-let [pl @pipeline-atom]
                 (pipeline/destroy! pl)
@@ -352,10 +352,10 @@
         id         (or (:id resolved) (keyword (gensym "entity-")))
         comp-cfgs  (dissoc resolved :id)
         components (reduce-kv
-                     (fn [m k v]
-                       (assoc m k (instantiate-component k v renderer)))
-                     {}
-                     comp-cfgs)]
+                    (fn [m k v]
+                      (assoc m k (instantiate-component k v renderer)))
+                    {}
+                    comp-cfgs)]
     (entity/make id components)))
 
 (defn- post-init-entity! [ent renderer]

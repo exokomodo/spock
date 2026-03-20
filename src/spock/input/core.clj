@@ -88,38 +88,38 @@
   [^long window]
   ;; Key callback
   (GLFW/glfwSetKeyCallback
-    window
-    (reify org.lwjgl.glfw.GLFWKeyCallbackI
-      (invoke [_ _win key _sc action _mods]
-        (when (>= key 0)
-          (cond
-            (= action GLFW/GLFW_PRESS)
-            (swap! key-states assoc key :pressed)
+   window
+   (reify org.lwjgl.glfw.GLFWKeyCallbackI
+     (invoke [_ _win key _sc action _mods]
+       (when (>= key 0)
+         (cond
+           (= action GLFW/GLFW_PRESS)
+           (swap! key-states assoc key :pressed)
 
-            (= action GLFW/GLFW_RELEASE)
-            (swap! key-states assoc key :released)
+           (= action GLFW/GLFW_RELEASE)
+           (swap! key-states assoc key :released)
             ;; GLFW_REPEAT: treat as held (do not overwrite :pressed on same frame)
-            :else nil)))))
+           :else nil)))))
 
   ;; Mouse button callback
   (GLFW/glfwSetMouseButtonCallback
-    window
-    (reify org.lwjgl.glfw.GLFWMouseButtonCallbackI
-      (invoke [_ _win button action _mods]
-        (when (>= button 0)
-          (cond
-            (= action GLFW/GLFW_PRESS)
-            (swap! mouse-button-states assoc button :pressed)
+   window
+   (reify org.lwjgl.glfw.GLFWMouseButtonCallbackI
+     (invoke [_ _win button action _mods]
+       (when (>= button 0)
+         (cond
+           (= action GLFW/GLFW_PRESS)
+           (swap! mouse-button-states assoc button :pressed)
 
-            (= action GLFW/GLFW_RELEASE)
-            (swap! mouse-button-states assoc button :released))))))
+           (= action GLFW/GLFW_RELEASE)
+           (swap! mouse-button-states assoc button :released))))))
 
   ;; Cursor position callback
   (GLFW/glfwSetCursorPosCallback
-    window
-    (reify org.lwjgl.glfw.GLFWCursorPosCallbackI
-      (invoke [_ _win x y]
-        (reset! cursor-pos [x y]))))
+   window
+   (reify org.lwjgl.glfw.GLFWCursorPosCallbackI
+     (invoke [_ _win x y]
+       (reset! cursor-pos [x y]))))
 
   nil)
 
@@ -133,13 +133,13 @@
   []
   (let [advance (fn [states]
                   (reduce-kv
-                    (fn [m k v]
-                      (case v
-                        :pressed  (assoc m k :held)
-                        :released (dissoc m k)   ; remove :none entries to keep map lean
-                        m))
-                    states
-                    states))]
+                   (fn [m k v]
+                     (case v
+                       :pressed  (assoc m k :held)
+                       :released (dissoc m k)   ; remove :none entries to keep map lean
+                       m))
+                   states
+                   states))]
     (swap! key-states advance)
     (swap! mouse-button-states advance)))
 

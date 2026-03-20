@@ -131,13 +131,13 @@
             (let [attrs (:attributes vertex-input)
                   ad (VkVertexInputAttributeDescription/calloc (count attrs) stack)]
               (dorun (map-indexed
-                       (fn [i {:keys [location format offset]}]
-                         (let [a (.get ad (int i))]
-                           (.location a (int location))
-                           (.binding  a 0)
-                           (.format   a (int format))
-                           (.offset   a (int offset))))
-                       attrs))
+                      (fn [i {:keys [location format offset]}]
+                        (let [a (.get ad (int i))]
+                          (.location a (int location))
+                          (.binding  a 0)
+                          (.format   a (int format))
+                          (.offset   a (int offset))))
+                      attrs))
               (.pVertexAttributeDescriptions vi ad)))
 
           ;; ---- input assembly ----
@@ -154,8 +154,8 @@
 
               ;; ---- dynamic state ----
               (let [dyn-states (doto (.mallocInt stack 2)
-                         (.put VK10/VK_DYNAMIC_STATE_VIEWPORT)
-                         (.put VK10/VK_DYNAMIC_STATE_SCISSOR)
+                                 (.put VK10/VK_DYNAMIC_STATE_VIEWPORT)
+                                 (.put VK10/VK_DYNAMIC_STATE_SCISSOR)
                                  (.flip))
                     dyn (VkPipelineDynamicStateCreateInfo/calloc stack)]
                 (.sType dyn VK10/VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO)
