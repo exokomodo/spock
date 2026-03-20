@@ -15,8 +15,9 @@
      Surface must already exist. Returns true on success.")
   (render! [this renderables]
     "Render one frame. renderables is a seq of Renderable.")
-  (cleanup! [this]
-    "Wait for GPU idle and release all resources.")
+  (cleanup! [this renderables]
+    "Wait for GPU idle, clean up renderables, and release all resources.
+     renderables — seq of Renderable; cleanup! is called on each before device destroy.")
   (get-clear-color [this]
     "Return current clear color as [r g b a] floats.")
   (set-clear-color! [this color]

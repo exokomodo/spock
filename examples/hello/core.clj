@@ -29,7 +29,12 @@
             ^VkCommandBuffer command-buffer
             3 1 0 0)
           (log/log "draw: vkCmdDraw issued"))
-        (log/log "draw: NO PIPELINE")))))
+        (log/log "draw: NO PIPELINE"))))
+
+  (cleanup! [_this _device]
+    (pipeline/destroy! @pipeline-atom)
+    (reset! pipeline-atom {})
+    (log/log "TriangleRenderable: pipeline destroyed")))
 
 (defn make-triangle-renderable []
   (->TriangleRenderable (atom {})))
