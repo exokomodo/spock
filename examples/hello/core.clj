@@ -14,27 +14,34 @@
   renderable/Renderable
 
   (draw [this command-buffer device render-pass extent]
-    ;; Lazily build the pipeline on first draw call — device/render-pass/extent
-    ;; are not available until the renderer is initialised.
+    ;; Lazily build the pipeline on first draw call
     (when (nil? (:pipeline @pipeline-atom))
-      (let [pl (-> (pipeline/builder device render-pass {:width  (.width  ^org.lwjgl.vulkan.VkExtent2D extent)
-                                                          :height (.height ^org.lwjgl.vulkan.VkExtent2D extent)})
-                   (pipeline/vert-path (str shader-dir "triangle.vert"))
-                   (pipeline/frag-path (str shader-dir "triangle.frag"))
-                   (pipeline/topology  :triangle-list)
-                   (pipeline/cull-mode :back)
-                   (pipeline/build!))]
-        (reset! pipeline-atom pl)))
+      (println "[TriangleRenderable] building pipeline, shader-dir:" shader-dir)
+      (try
+        (let [pl (-> (pipeline/builder device render-pass {:width  (.width  ^org.lwjgl.vulkan.VkExtent2D extent)
+                                                            :height (.height ^org.lwjgl.vulkan.VkExtent2D extent)})
+                     (pipeline/vert-path (str shader-dir "triangle.vert"))
+                     (pipeline/frag-path (str shader-dir "triangle.frag"))
+                     (pipeline/topology  :triangle-list)
+                     (pipeline/cull-mode :back)
+                     (pipeline/build!))]
+          (println "[TriangleRenderable] pipeline built:" pl)
+          (reset! pipeline-atom pl))
+        (catch Exception e
+          (println "[TriangleRenderable] pipeline build FAILED:" (.getMessage e))
+          (.printStackTrace e))))
     ;; Record draw commands
     (let [{:keys [pipeline layout]} @pipeline-atom]
-      (when (and pipeline layout)
-        (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
-          ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-          org.lwjgl.vulkan.VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
-          (long pipeline))
-        (org.lwjgl.vulkan.VK10/vkCmdDraw
-          ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-          3 1 0 0)))))
+      (if (and pipeline layout)
+        (do
+          (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
+            ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+            org.lwjgl.vulkan.VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
+            (long pipeline))
+          (org.lwjgl.vulkan.VK10/vkCmdDraw
+            ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+            3 1 0 0))
+        (println "[TriangleRenderable] draw skipped — no pipeline")))))
 
 (defn make-triangle-renderable [shader-dir]
   (->TriangleRenderable shader-dir (atom {})))
