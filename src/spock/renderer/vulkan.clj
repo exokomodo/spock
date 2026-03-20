@@ -21,7 +21,7 @@
             VkCommandBufferBeginInfo VkRenderPassBeginInfo
             VkSemaphoreCreateInfo VkFenceCreateInfo
             VkSubmitInfo VkPresentInfoKHR
-            VkClearValue VkOffset2D VkExtent2D
+            VkClearValue VkOffset2D VkExtent2D VkViewport VkRect2D
             KHRSurface KHRSwapchain]
            [org.lwjgl.glfw GLFW GLFWVulkan])
 )
@@ -507,9 +507,23 @@
                           (.width  (int (:width ext)))
                           (.height (int (:height ext))))))
         _    (VK10/vkCmdBeginRenderPass cb rbi VK10/VK_SUBPASS_CONTENTS_INLINE)
+        w    (int (:width ext))
+        h    (int (:height ext))
+        ;; Set dynamic viewport and scissor
+        vp   (doto (VkViewport/calloc 1 stack)
+               (-> (.get 0)
+                   (doto (.x 0.0) (.y 0.0)
+                         (.width (float w)) (.height (float h))
+                         (.minDepth 0.0) (.maxDepth 1.0))))
+        sc   (doto (VkRect2D/calloc 1 stack)
+               (-> (.get 0)
+                   (doto (-> .offset (.set 0 0))
+                         (-> .extent (.set w h)))))
+        _    (VK10/vkCmdSetViewport cb 0 vp)
+        _    (VK10/vkCmdSetScissor  cb 0 sc)
         vkext (doto (VkExtent2D/malloc stack)
-                (.width  (int (:width ext)))
-                (.height (int (:height ext))))]
+                (.width  w)
+                (.height h))]
     (doseq [r renderables]
       (renderable/draw r cb dev rp vkext))
     (VK10/vkCmdEndRenderPass cb)
