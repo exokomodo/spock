@@ -17,6 +17,7 @@
 
   (draw [_this command-buffer _device _render-pass _extent]
     (let [{:keys [pipeline layout]} @pipeline-atom]
+      (log/log "draw called pipeline=" pipeline "layout=" layout "cb=" command-buffer)
       (if (and pipeline layout)
         (do
           (VK10/vkCmdBindPipeline
@@ -25,8 +26,9 @@
             (long pipeline))
           (VK10/vkCmdDraw
             ^VkCommandBuffer command-buffer
-            3 1 0 0))
-        (log/log "TriangleRenderable.draw: no pipeline yet")))))
+            3 1 0 0)
+          (log/log "draw: vkCmdDraw issued"))
+        (log/log "draw: NO PIPELINE")))))
 
 (defn make-triangle-renderable []
   (->TriangleRenderable (atom {})))
