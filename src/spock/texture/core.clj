@@ -324,27 +324,34 @@
             img-size (* width height 4)
 
             ;; Extract ARGB int array and convert to RGBA byte order for Vulkan
-            pixels   (int-array (* width height))
-            _        (.getRGB rgba-img 0 0 width height pixels 0 width)
+            pixels    (int-array (* width height))
+            _         (.getRGB rgba-img 0 0 width height pixels 0 width)
+            _         (println "[texture] D - got" (alength pixels) "pixels, allocating" img-size "bytes")
             pixel-buf (MemoryUtil/memAlloc (int img-size))
-            _         (do
-                        (doseq [px pixels]
-                          (let [a (bit-and (bit-shift-right px 24) 0xFF)
-                                r (bit-and (bit-shift-right px 16) 0xFF)
-                                g (bit-and (bit-shift-right px  8) 0xFF)
-                                b (bit-and px 0xFF)]
-                            (.put pixel-buf (byte r))
-                            (.put pixel-buf (byte g))
-                            (.put pixel-buf (byte b))
-                            (.put pixel-buf (byte a))))
-                        (.flip pixel-buf))
+            _         (let [n (alength pixels)]
+                        (loop [i 0]
+                          (when (< i n)
+                            (let [px (aget pixels i)
+                                  r  (bit-and (bit-shift-right px 16) 0xFF)
+                                  g  (bit-and (bit-shift-right px  8) 0xFF)
+                                  b  (bit-and px 0xFF)
+                                  a  (bit-and (unsigned-bit-shift-right px 24) 0xFF)]
+                              (.put pixel-buf (byte r))
+                              (.put pixel-buf (byte g))
+                              (.put pixel-buf (byte b))
+                              (.put pixel-buf (byte a)))
+                            (recur (inc i))))
+                        (.flip pixel-buf)
+                        (println "[texture] E - pixel conversion done"))
 
             ;; --- Staging buffer ---
             staging-host-props (bit-or VK10/VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                        VK10/VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
             staging-usage      (bit-or VK10/VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+            _         (println "[texture] F - creating staging buffer")
             {:keys [buffer staging-memory]}
             (let [sb (create-buffer! device pd img-size staging-usage staging-host-props)]
+              (println "[texture] G - staging buffer created")
               {:buffer (:buffer sb) :staging-memory (:memory sb)})
 
             ;; Map and copy pixel data into staging buffer
@@ -358,34 +365,41 @@
                      (VK10/vkUnmapMemory device staging-memory))
                    (finally
                      (MemoryStack/stackPop))))
-            _  (MemoryUtil/memFree pixel-buf)
+            _  (do (println "[texture] H - map/copy done") (MemoryUtil/memFree pixel-buf))
 
             ;; --- Device-local image ---
             VK_FORMAT_R8G8B8A8_SRGB 43
             image-usage (bit-or VK10/VK_IMAGE_USAGE_TRANSFER_DST_BIT
                                 VK10/VK_IMAGE_USAGE_SAMPLED_BIT)
+            _           (println "[texture] I - creating device image")
             {:keys [image image-memory]}
             (create-image! device pd width height
                            VK_FORMAT_R8G8B8A8_SRGB
                            VK10/VK_IMAGE_TILING_OPTIMAL
                            image-usage
                            VK10/VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+            _           (println "[texture] J - image created, beginning cmd buffer")
 
             ;; --- Upload via one-shot command buffer ---
             cb (begin-single-time-commands! device command-pool)]
 
+        (println "[texture] K - recording transitions")
         ;; Transition: UNDEFINED → TRANSFER_DST_OPTIMAL
         (transition-image-layout! cb image
                                   VK10/VK_IMAGE_LAYOUT_UNDEFINED
                                   VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        (println "[texture] L - copy buffer to image")
         ;; Copy buffer → image
         (copy-buffer-to-image! cb buffer image width height)
+        (println "[texture] M - final transition")
         ;; Transition: TRANSFER_DST_OPTIMAL → SHADER_READ_ONLY_OPTIMAL
         (transition-image-layout! cb image
                                   VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
                                   VK10/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
 
+        (println "[texture] N - submitting queue")
         (end-single-time-commands! device command-pool cb gfx-queue)
+        (println "[texture] O - done")
 
         ;; Free staging buffer
         (VK10/vkDestroyBuffer device buffer nil)
