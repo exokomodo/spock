@@ -15,13 +15,18 @@ endif
 # Detect headless environment: no Wayland or X11 display available.
 # If headless, prefix commands that open windows with cage (Wayland kiosk).
 # cage is only used when the binary is available; otherwise fail loudly.
+OS := $(shell uname -s)
 ifeq ($(WAYLAND_DISPLAY)$(DISPLAY),)
-  CAGE_AVAILABLE := $(shell which cage 2>/dev/null)
-  ifdef CAGE_AVAILABLE
-    DISPLAY_PREFIX := cage --
+  ifeq ($(OS),Linux)
+    CAGE_AVAILABLE := $(shell which cage 2>/dev/null)
+    ifdef CAGE_AVAILABLE
+      DISPLAY_PREFIX := cage --
+    else
+      $(warning Neither WAYLAND_DISPLAY nor DISPLAY is set, and cage is not installed.)
+      $(warning Install cage or run from a Wayland/X11 session.)
+      DISPLAY_PREFIX :=
+    endif
   else
-    $(warning Neither WAYLAND_DISPLAY nor DISPLAY is set, and cage is not installed.)
-    $(warning Install cage or run from a Wayland/X11 session.)
     DISPLAY_PREFIX :=
   endif
 else
