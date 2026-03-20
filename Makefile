@@ -142,6 +142,11 @@ test: ## Run tests
 run/hello: build/shaders ## Run the hello example
 	$(DISPLAY_PREFIX) lein hello
 
+.PHONY: shaders/sprite
+shaders/sprite: ## Compile the sprite shaders (used by :sprite renderable)
+	glslc src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
+	glslc src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+
 .PHONY: run/spin-shooter
 run/spin-shooter: build/shaders ## Run the spin-shooter example
 	$(DISPLAY_PREFIX) lein spin-shooter
