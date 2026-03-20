@@ -1,0 +1,6 @@
+{:entry    :game
+ :settings "examples/spin_shooter/settings.edn"
+ :state    {:score 0}
+
+ :scenes [{:name :game     :file "examples/spin_shooter/scenes/game.edn"}
+           {:name :gameover :file "examples/spin_shooter/scenes/gameover.edn"}]}

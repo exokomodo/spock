@@ -1,0 +1,5 @@
+{:script spin-shooter.scripts.gameover
+
+ ;; Minimal scene — just text implied by reddish clear color.
+ ;; R key restarts.
+ :entities []}
