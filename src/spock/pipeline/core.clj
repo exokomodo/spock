@@ -10,7 +10,6 @@
             VkGraphicsPipelineCreateInfo
             VkPipelineShaderStageCreateInfo
             VkPipelineVertexInputStateCreateInfo
-            VkPipelineVertexInputStateCreateInfo
             VkVertexInputBindingDescription
             VkVertexInputAttributeDescription
             VkPipelineInputAssemblyStateCreateInfo
@@ -22,7 +21,17 @@
             VkPipelineColorBlendAttachmentState
             VkPipelineLayoutCreateInfo
             VkPushConstantRange
-            VkShaderModuleCreateInfo]))
+            VkShaderModuleCreateInfo
+            VkDescriptorSetLayoutBinding
+            VkDescriptorSetLayoutCreateInfo
+            VkDescriptorSetLayout
+            VkDescriptorPoolSize
+            VkDescriptorPoolCreateInfo
+            VkDescriptorPool
+            VkDescriptorSetAllocateInfo
+            VkDescriptorSet
+            VkDescriptorImageInfo
+            VkWriteDescriptorSet]))
 
 ;; ---------------------------------------------------------------------------
 ;; Builder constructor
