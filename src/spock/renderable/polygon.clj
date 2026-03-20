@@ -52,10 +52,10 @@
         step (/ (* 2.0 Math/PI) n)]
     (float-array
      (mapcat
-      (fn [i]
-        (let [angle (* i step)]
-          [(* (double radius) (Math/cos angle))
-           (* (double radius) (- (Math/sin angle)))]))  ; flip Y for Vulkan
+      (fn [^long i]
+        (let [angle (double (* i step))]
+          [(double (* radius (Math/cos angle)))
+           (double (- (* radius (Math/sin angle))))]))  ; flip Y for Vulkan
       (range n)))))
 
 ;; ---------------------------------------------------------------------------
