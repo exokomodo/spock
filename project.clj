@@ -16,7 +16,14 @@
                  [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-linux-arm64"]
                  [org.lwjgl/lwjgl "3.3.4" :classifier "natives-linux"]
                  [org.lwjgl/lwjgl-glfw "3.3.4" :classifier "natives-linux"]
-                 [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-linux"]]
+                 [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-linux"]
+                 ;; Natives — macOS (Intel + Apple Silicon)
+                 [org.lwjgl/lwjgl "3.3.4" :classifier "natives-macos"]
+                 [org.lwjgl/lwjgl-glfw "3.3.4" :classifier "natives-macos"]
+                 [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-macos"]
+                 [org.lwjgl/lwjgl "3.3.4" :classifier "natives-macos-arm64"]
+                 [org.lwjgl/lwjgl-glfw "3.3.4" :classifier "natives-macos-arm64"]
+                 [org.lwjgl/lwjgl-openal "3.3.4" :classifier "natives-macos-arm64"]]
   ;; Note: lwjgl-vulkan has no natives — it uses the system Vulkan loader (libvulkan.so)
 
   :source-paths ["src"]
