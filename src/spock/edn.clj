@@ -195,7 +195,7 @@
                   _      (VK10/vkBindBufferMemory device buf mem 0)
                   pp     (.mallocPointer stack 1)
                   _      (VK10/vkMapMemory device mem 0 size 0 pp)
-                  mapped (.getByteBuffer (.get pp 0) (int size))]
+                  mapped (org.lwjgl.system.MemoryUtil/memByteBuffer (.get pp 0) (int size))]
               (.order mapped ByteOrder/LITTLE_ENDIAN)
               (let [fb (.asFloatBuffer mapped)]
                 (doseq [f float-data] (.put fb (float f))))
