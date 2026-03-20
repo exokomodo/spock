@@ -1,3 +1,15 @@
+SHELL := /bin/bash
+.SHELLFLAGS = -e -c
+.DEFAULT_GOAL := help
+.ONESHELL:
+.SILENT:
+MAKEFLAGS += --no-print-directory
+
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 .PHONY: all build test clean run/hello setup
 
 # Detect headless environment: no Wayland or X11 display available.
@@ -16,33 +28,50 @@ else
   DISPLAY_PREFIX :=
 endif
 
-# Default target
-all: build
+BIN_DIR ?= /usr/local/bin
 
-## Setup — install lein dependencies
-setup:
-	lein deps
+##@ Setup environment
 
-## Build — compile all namespaces
-build:
+.PHONY: setup
+setup: setup/lein ## Setup the development environment
+
+.PHONY: setup/lein
+setup/lein:
+	curl -fL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein > $(BIN_DIR)/lein
+	chmod +x $(BIN_DIR)/lein
+
+##@ Development tools
+.PHONY: build
+build: ## Build the project
 	lein compile
 
-## Test — run test suite
-test:
-	lein test
-
-## Clean — remove compiled artifacts
-clean:
+.PHONY: clean
+clean: ## Clean the project
 	lein clean
 
-## Run the hello example (uses cage if headless)
-run/hello:
+.PHONY: deps
+deps: ## Install project dependencies
+	lein deps
+
+.PHONY: test
+test: ## Run tests
+	lein test
+
+##@ Examples
+.PHONY: run/hello
+run/hello: shaders/hello
 	$(DISPLAY_PREFIX) lein hello
 
-## Compile shaders for the hello example
+.PHONY: shaders/hello
 shaders/hello:
 	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
 	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
 
-## Build + compile shaders + run hello
-hello: shaders/hello run/hello
+.PHONY: hello
+hello: run/hello ## Run the hello example
+
+##@ Utilities
+
+.PHONY: help
+help: ## Displays help info
+	awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
