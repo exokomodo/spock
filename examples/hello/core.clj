@@ -39,7 +39,7 @@
         dev    (renderer/get-device      renderer)]
     (log/log "build-pipeline! extent=" ext "rp=" rp "dev=" dev)
     (try
-      (let [pl (-> (pipeline/builder dev rp ext)
+      (let [pl (-> (pipeline/builder dev rp)
                    (pipeline/vert-path (str shader-dir "triangle.vert"))
                    (pipeline/frag-path (str shader-dir "triangle.frag"))
                    (pipeline/topology   :triangle-list)

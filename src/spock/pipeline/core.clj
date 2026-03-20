@@ -24,13 +24,13 @@
             VkPipelineVertexInputStateCreateInfo
             VkPipelineInputAssemblyStateCreateInfo
             VkPipelineViewportStateCreateInfo
+            VkPipelineDynamicStateCreateInfo
             VkPipelineRasterizationStateCreateInfo
             VkPipelineMultisampleStateCreateInfo
             VkPipelineColorBlendStateCreateInfo
             VkPipelineColorBlendAttachmentState
             VkPipelineLayoutCreateInfo
-            VkShaderModuleCreateInfo
-            VkViewport VkRect2D VkOffset2D VkExtent2D]))
+            VkShaderModuleCreateInfo]))
 
 ;; ---------------------------------------------------------------------------
 ;; Keyword → Vulkan constant maps
@@ -61,11 +61,10 @@
   "Create a pipeline config map.
    device      — VkDevice
    render-pass — long handle
-   extent      — {:width int :height int}"
-  [^VkDevice device render-pass extent]
+   Viewport and scissor are dynamic — set per-frame via vkCmdSetViewport/Scissor."
+  [^VkDevice device render-pass]
   {:device      device
    :render-pass render-pass
-   :extent      extent
    ;; Shader stages (populated by vert-spv / frag-spv)
    :vert-spv    nil
    :frag-spv    nil
@@ -157,7 +156,7 @@
    Returns {:pipeline long :layout long} or throws on failure.
    Caller is responsible for calling destroy! when done."
   [config]
-  (let [{:keys [^VkDevice device render-pass extent
+  (let [{:keys [^VkDevice device render-pass
                 vert-spv frag-spv
                 topology cull-mode front-face polygon-mode
                 blend-mode]} config]
@@ -196,24 +195,21 @@
                            (.topology (get topology-map topology VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
                            (.primitiveRestartEnable false))
 
-          ;; Viewport + scissor (static — no dynamic state)
-          w      (int (:width extent))
-          h      (int (:height extent))
-          vp-buf (doto (VkViewport/calloc 1 ^MemoryStack stack)
-                   (-> (.get 0)
-                       (doto (.x 0.0) (.y 0.0)
-                             (.width (float w)) (.height (float h))
-                             (.minDepth 0.0) (.maxDepth 1.0))))
-          sc-buf (doto (VkRect2D/calloc 1 ^MemoryStack stack)
-                   (-> (.get 0)
-                       (doto (.offset (doto (VkOffset2D/calloc stack) (.set 0 0)))
-                             (.extent (doto (VkExtent2D/calloc stack) (.width w) (.height h))))))
+          ;; Viewport + scissor — dynamic state, set per-frame via vkCmdSetViewport/Scissor
+          ;; Count must be declared here but actual values are set in the command buffer.
           viewport-ci (doto (VkPipelineViewportStateCreateInfo/calloc stack)
                         (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO)
                         (.viewportCount 1)
-                        (.pViewports vp-buf)
-                        (.scissorCount 1)
-                        (.pScissors sc-buf))
+                        (.scissorCount 1))
+
+          ;; Dynamic state declaration
+          dynamic-states (doto (.mallocInt stack 2)
+                           (.put 0 VK10/VK_DYNAMIC_STATE_VIEWPORT)
+                           (.put 1 VK10/VK_DYNAMIC_STATE_SCISSOR)
+                           .flip)
+          dynamic-ci (doto (VkPipelineDynamicStateCreateInfo/calloc stack)
+                       (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO)
+                       (.pDynamicStates dynamic-states))
 
           ;; Rasterizer
           raster (doto (VkPipelineRasterizationStateCreateInfo/calloc stack)
@@ -275,7 +271,7 @@
                                    (.pMultisampleState multisample)
                                    (.pDepthStencilState nil)
                                    (.pColorBlendState color-blend)
-                                   (.pDynamicState nil)
+                                   (.pDynamicState dynamic-ci)
                                    (.layout layout)
                                    (.renderPass (long render-pass))
                                    (.subpass 0)
