@@ -305,7 +305,11 @@
         ^VkPhysicalDevice pd  (.getPhysicalDevice device)]
 
     (log/info "load-texture! loading:" path)
-
+    (println "[texture] A - before ImageIO/read")
+    (let [^BufferedImage bi (ImageIO/read (File. ^String path))]
+      (println "[texture] B - image read, nil?" (nil? bi))
+      (when-not bi (throw (RuntimeException. (str "Failed to load image: " path))))
+      (println "[texture] C - starting pixel conversion"))
     ;; --- Load image pixels via Java2D ---
     (let [^BufferedImage bi (ImageIO/read (File. ^String path))]
       (when-not bi
