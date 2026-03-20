@@ -207,7 +207,7 @@
       (let [barrier (doto (VkImageMemoryBarrier/calloc 1 stack)
                       (-> (.get 0)
                           (doto
-                            (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
+                           (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
                             (.oldLayout (int old-layout))
                             (.newLayout (int new-layout))
                             (.srcQueueFamilyIndex VK10/VK_QUEUE_FAMILY_IGNORED)
@@ -239,12 +239,12 @@
 
                 :else
                 (throw (RuntimeException.
-                         (str "Unsupported layout transition: " old-layout " -> " new-layout))))]
+                        (str "Unsupported layout transition: " old-layout " -> " new-layout))))]
           (.srcAccessMask b0 (int src-access))
           (.dstAccessMask b0 (int dst-access))
           (VK10/vkCmdPipelineBarrier cb
-            (int src-stage) (int dst-stage)
-            0 nil nil barrier)))
+                                     (int src-stage) (int dst-stage)
+                                     0 nil nil barrier)))
       (finally
         (MemoryStack/stackPop)))))
 
@@ -256,7 +256,7 @@
       (let [region (doto (VkBufferImageCopy/calloc 1 stack)
                      (-> (.get 0)
                          (doto
-                           (.bufferOffset 0)
+                          (.bufferOffset 0)
                            (.bufferRowLength 0)
                            (.bufferImageHeight 0))))]
         (let [r0 (.get region 0)]
@@ -272,9 +272,9 @@
             (.height (int height))
             (.depth 1)))
         (VK10/vkCmdCopyBufferToImage
-          cb src-buffer dst-image
-          VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-          region))
+         cb src-buffer dst-image
+         VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+         region))
       (finally
         (MemoryStack/stackPop)))))
 
@@ -316,7 +316,7 @@
             rgba-img (doto (BufferedImage. width height BufferedImage/TYPE_INT_ARGB)
                        (-> .getGraphics
                            (doto (.drawImage bi 0 0 nil)
-                                 (.dispose))))
+                             (.dispose))))
             img-size (* width height 4)
 
             ;; Extract ARGB int array and convert to RGBA byte order for Vulkan

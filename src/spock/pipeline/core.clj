@@ -128,15 +128,15 @@
       (let [n   (count bindings)
             buf (VkDescriptorSetLayoutBinding/calloc n stack)]
         (dorun
-          (map-indexed
-            (fn [i {:keys [binding type stage]}]
-              (doto ^VkDescriptorSetLayoutBinding (.get buf (int i))
-                (.binding         (int binding))
-                (.descriptorType  (int (binding-type->vk type)))
-                (.descriptorCount 1)
-                (.stageFlags      (int (binding-stage->vk stage)))
-                (.pImmutableSamplers nil)))
-            bindings))
+         (map-indexed
+          (fn [i {:keys [binding type stage]}]
+            (doto ^VkDescriptorSetLayoutBinding (.get buf (int i))
+              (.binding         (int binding))
+              (.descriptorType  (int (binding-type->vk type)))
+              (.descriptorCount 1)
+              (.stageFlags      (int (binding-stage->vk stage)))
+              (.pImmutableSamplers nil)))
+          bindings))
         (let [ci (doto (VkDescriptorSetLayoutCreateInfo/calloc stack)
                    (.sType VK10/VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
                    (.pBindings buf))
@@ -361,7 +361,7 @@
       (let [ps  (doto (VkDescriptorPoolSize/calloc 1 stack)
                   (-> (.get 0)
                       (doto
-                        (.type VK10/VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                       (.type VK10/VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                         (.descriptorCount (int max-sets)))))
             ci  (doto (VkDescriptorPoolCreateInfo/calloc stack)
                   (.sType VK10/VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO)
@@ -400,13 +400,13 @@
               img-info (doto (VkDescriptorImageInfo/calloc 1 stack)
                          (-> (.get 0)
                              (doto
-                               (.imageLayout VK10/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+                              (.imageLayout VK10/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
                                (.imageView   (long (:image-view texture-map)))
                                (.sampler     (long (:sampler    texture-map))))))
               write   (doto (VkWriteDescriptorSet/calloc 1 stack)
                         (-> (.get 0)
                             (doto
-                              (.sType VK10/VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
+                             (.sType VK10/VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET)
                               (.dstSet ds)
                               (.dstBinding 0)
                               (.dstArrayElement 0)
