@@ -326,24 +326,18 @@
             ;; Extract ARGB int array and convert to RGBA byte order for Vulkan
             pixels    (int-array (* width height))
             _         (.getRGB rgba-img 0 0 width height pixels 0 width)
-            _         (println "[texture] D - got" (alength pixels) "pixels, allocating" img-size "bytes")
-            pixel-buf (do (println "[texture] D2 - calling memAlloc")
-                          (let [b (MemoryUtil/memAlloc (int img-size))]
-                            (println "[texture] D3 - memAlloc done")
-                            b))
-            _         (let [n (alength pixels)]
-                        (loop [i 0]
+            pixel-buf (MemoryUtil/memAlloc (int img-size))
+            _         (let [n   (alength pixels)
+                            arr (byte-array img-size)]
+                        (loop [i 0 j 0]
                           (when (< i n)
-                            (let [px (aget pixels i)
-                                  r  (bit-and (bit-shift-right px 16) 0xFF)
-                                  g  (bit-and (bit-shift-right px  8) 0xFF)
-                                  b  (bit-and px 0xFF)
-                                  a  (bit-and (unsigned-bit-shift-right px 24) 0xFF)]
-                              (.put pixel-buf (byte r))
-                              (.put pixel-buf (byte g))
-                              (.put pixel-buf (byte b))
-                              (.put pixel-buf (byte a)))
-                            (recur (inc i))))
+                            (let [px (aget pixels i)]
+                              (aset arr j       (byte (bit-and (bit-shift-right px 16) 0xFF)))
+                              (aset arr (+ j 1) (byte (bit-and (bit-shift-right px  8) 0xFF)))
+                              (aset arr (+ j 2) (byte (bit-and px 0xFF)))
+                              (aset arr (+ j 3) (byte (bit-and (unsigned-bit-shift-right px 24) 0xFF))))
+                            (recur (inc i) (+ j 4))))
+                        (.put pixel-buf arr)
                         (.flip pixel-buf)
                         (println "[texture] E - pixel conversion done"))
 
