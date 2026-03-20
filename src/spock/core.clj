@@ -14,7 +14,7 @@
    Returns [game lifecycle] ready to pass to game/start!.
 
    Dispatch value is a format keyword:
-     :edn — EDN file with :title, :width, :height, :script, :renderables"
+     :edn — EDN file with :title, :width, :height, :script, :entities"
   (fn [fmt _path] fmt))
 
 (defmethod load-game :edn [_ path]

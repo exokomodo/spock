@@ -31,32 +31,16 @@
   :resource-paths ["resources"]
 
   :profiles
-  {:edn   {:main spock.main
-           :aot [spock.main]
-           :source-paths ["src" "examples"]
-           :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
-                        (= "Mac OS X" (System/getProperty "os.name"))
-                        (conj "-XstartOnFirstThread"
-                              (str "-Dorg.lwjgl.vulkan.libname="
-                                   (or (System/getenv "VULKAN_LOADER")
-                                       "/usr/local/lib/libvulkan.1.dylib"))))}
-   :hello {:main hello.core
-           :aot [hello.core]
-           :source-paths ["src" "examples"]
-           ;; macOS requires GLFW on the first thread of the process.
-           ;; -XstartOnFirstThread is macOS-only and must NOT be passed on Linux
-           ;; (the JVM will refuse to start with an unrecognised option).
-           ;; LWJGL library path is set via JVM_OPTS / VULKAN_LOADER on macOS.
-           :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
-                        (= "Mac OS X" (System/getProperty "os.name"))
-                        (conj "-XstartOnFirstThread"
-                              (str "-Dorg.lwjgl.vulkan.libname="
-                                   (or (System/getenv "VULKAN_LOADER")
-                                       "/usr/local/lib/libvulkan.1.dylib"))))}}
-
-
+  {:edn {:main spock.main
+         :aot [spock.main]
+         :source-paths ["src" "examples"]
+         :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
+                      (= "Mac OS X" (System/getProperty "os.name"))
+                      (conj "-XstartOnFirstThread"
+                            (str "-Dorg.lwjgl.vulkan.libname="
+                                 (or (System/getenv "VULKAN_LOADER")
+                                     "/usr/local/lib/libvulkan.1.dylib"))))}}
 
   :aliases
-  {"hello"  ["with-profile" "hello" "run"]
-   "record" ["with-profile" "hello" "run" "--" "--record"]
-   "edn"    ["with-profile" "edn"   "run" "--"]})
+  {"hello"  ["with-profile" "edn" "run" "--" "examples/hello/scene.edn"]
+   "edn"    ["with-profile" "edn" "run" "--"]})

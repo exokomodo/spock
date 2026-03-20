@@ -75,8 +75,8 @@ test: ## Run tests
 run/hello: shaders/hello
 	$(DISPLAY_PREFIX) lein hello
 
-# EDN-driven game runner. Usage: make run/edn EDN=examples/hello/game.edn
-EDN ?= examples/hello/game.edn
+# EDN-driven game runner. Usage: make run/edn EDN=examples/hello/scene.edn
+EDN ?= examples/hello/scene.edn
 .PHONY: run/edn
 run/edn: shaders/hello
 	$(DISPLAY_PREFIX) lein edn $(EDN)

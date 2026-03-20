@@ -16,7 +16,8 @@
                            checked every frame by render thread
    - error-p   promise — render thread delivers any frame-loop exception here"
   (:require [spock.renderer.core :as renderer]
-            [spock.renderer.vulkan :as vk])
+            [spock.renderer.vulkan :as vk]
+            [spock.entity :as entity])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -35,16 +36,28 @@
 ;; Game record
 ;; ---------------------------------------------------------------------------
 (defrecord Game [title width height renderer state])
-;; state atom: {:window 0 :renderables [] :running? false}
+;; state atom: {:window 0 :entities [] :running? false}
 
 (defn make-game
   ([title]     (make-game title 1280 720))
   ([title w h] (->Game title w h
                        (vk/make-vulkan-renderer title)
-                       (atom {:window 0 :renderables [] :running? false}))))
+                       (atom {:window 0 :entities [] :running? false}))))
 
-(defn add-renderable! [game renderable]
-  (swap! (:state game) update :renderables conj renderable))
+(defn add-entity!
+  "Add an Entity to the game."
+  [game ent]
+  (swap! (:state game) update :entities conj ent))
+
+(defn add-renderable!
+  "Backward-compatible helper: wraps a bare Renderable in an anonymous entity."
+  [game renderable]
+  (add-entity! game (entity/from-renderable renderable)))
+
+(defn get-entities
+  "Return the current entity list."
+  [game]
+  (:entities @(:state game)))
 
 ;; ---------------------------------------------------------------------------
 ;; GLFW helpers (main thread only)
@@ -87,32 +100,26 @@
 ;; Render thread
 ;; ---------------------------------------------------------------------------
 (defn- render-thread-fn
-  "Entry point for the render thread.
-   window   — GLFW window handle (long); surface already created by main thread
-   renderer — Renderer instance (already has surface in state)
-   ready-p  — promise to deliver true/exception once Vulkan init is done
-   stop?    — volatile! read each frame; set true by main to request exit
-   error-p  — promise to deliver any frame-loop exception"
+  "Entry point for the render thread."
   [game ready-p stop? error-p]
-  (let [r        (:renderer game)
-        window   (:window @(:state game))
-        w        (:width game)
-        h        (:height game)]
+  (let [r (:renderer game)
+        window (:window @(:state game))
+        w (:width game)
+        h (:height game)]
     (try
-      ;; Vulkan init (device onwards — surface was created on main thread)
       (when-not (renderer/init! r window w h)
         (throw (RuntimeException. "Vulkan renderer init failed")))
-      ;; Signal main thread: ready to go
       (deliver ready-p true)
-      ;; Frame loop
+      ;; Frame loop — extract renderables from entities each frame
       (loop []
         (when-not @stop?
-          (renderer/render! r (:renderables @(:state game)))
+          (renderer/render! r (entity/renderables (:entities @(:state game))))
           (recur)))
-      ;; Drain GPU and clean up renderables before device destruction
-      (renderer/cleanup! r (:renderables @(:state game)))
+      ;; Clean up entity renderables while device is still alive,
+      ;; then drain GPU and release all Vulkan resources.
+      (entity/cleanup-all! (:entities @(:state game)) (renderer/get-device r))
+      (renderer/cleanup! r)
       (catch Exception e
-        ;; Deliver to whichever promise hasn't been delivered yet
         (if (realized? ready-p)
           (deliver error-p e)
           (deliver ready-p e))))))
@@ -121,10 +128,7 @@
 ;; start!
 ;; ---------------------------------------------------------------------------
 (defn start!
-  "Start the game. Blocks on the main thread until the window is closed.
-   - GLFW window + surface: main thread
-   - Vulkan device/swapchain/frame loop: render thread
-   - Event polling + on-tick!: main thread"
+  "Start the game. Blocks on the main thread until the window is closed."
   [game lifecycle]
   (let [window  (init-window! game)
         r       (:renderer game)
@@ -135,22 +139,16 @@
                    ^Runnable (fn [] (render-thread-fn game ready-p stop? error-p))
                    "spock-render")]
     (try
-      ;; Surface must be created on the main thread before handing off to render thread
       (renderer/create-surface! r window)
-      ;; Launch render thread — it will do the rest of Vulkan init
       (.start render-t)
-      ;; Wait for Vulkan init to complete (or fail)
       (let [ready-val @ready-p]
         (when (instance? Exception ready-val)
           (throw ready-val)))
-      ;; User init (on main thread, Vulkan is ready)
       (on-init! lifecycle)
       (swap! (:state game) assoc :running? true)
-      ;; Main event loop
       (loop [last-t (System/nanoTime)]
         (when (and (:running? @(:state game))
                    (not (GLFW/glfwWindowShouldClose window)))
-          ;; Check for render thread errors
           (when (realized? error-p)
             (throw @error-p))
           (GLFW/glfwPollEvents)
@@ -160,7 +158,6 @@
             (recur now))))
       (on-done! lifecycle)
       (finally
-        ;; Signal render thread and wait for it
         (vreset! stop? true)
         (.join render-t 5000)
         (destroy-window! game)))))

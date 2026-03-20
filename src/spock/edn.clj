@@ -5,7 +5,20 @@
    - Pure data EDN — no fn literals, no eval
    - :script references a Clojure namespace symbol; the engine requires it
      and resolves on-init / on-tick / on-done as vars (all optional)
-   - Renderables are instantiated via the renderable registry by :type keyword
+   - Entities are defined with component keys; :renderable values are
+     instantiated via the renderable registry by :type keyword
+
+   EDN format:
+     {:title  \"My Game\"
+      :width  1280
+      :height 720
+      :script my.game.script        ; optional
+      :entities [{:id         :triangle
+                  :renderable {:type    :triangle
+                               :shaders {:vert \"...\" :frag \"...\"}}
+                  :transform  {:position [0 0 0]
+                               :rotation [0 0 0]
+                               :scale    [1 1 1]}}]}
 
    Usage:
      (def [game lifecycle] (load-game \"game.edn\"))
@@ -13,6 +26,7 @@
   (:require [clojure.edn     :as edn]
             [clojure.java.io :as io]
             [spock.game.core  :as game]
+            [spock.entity     :as entity]
             [spock.renderable.core :as renderable]
             [spock.renderer.core   :as renderer]
             [spock.pipeline.core   :as pipeline]
@@ -51,8 +65,6 @@
         frag-path (:frag shaders)]
     (when-not (and vert-path frag-path)
       (throw (ex-info ":triangle renderable requires :shaders {:vert ... :frag ...}" {:cfg cfg})))
-    ;; Build the pipeline atom — pipeline is populated in on-init! once the
-    ;; renderer is ready, so we return a placeholder atom here and fill it later.
     (let [pipeline-atom (atom {})
           r (reify renderable/Renderable
               (draw [_this command-buffer _device _render-pass _extent]
@@ -70,7 +82,6 @@
               (cleanup! [_this _device]
                 (pipeline/destroy! @pipeline-atom)
                 (reset! pipeline-atom {})))]
-      ;; Stash builder fn on the renderable's meta so on-init! can build the pipeline
       (with-meta r {:pipeline-atom pipeline-atom
                     :vert-path     vert-path
                     :frag-path     frag-path}))))
@@ -90,6 +101,51 @@
 
 ;; Register built-in types at load time
 (register-renderable! :triangle make-triangle-renderable)
+
+;; ---------------------------------------------------------------------------
+;; Component instantiation
+;; ---------------------------------------------------------------------------
+
+(defn- instantiate-component
+  "Given a component key k and its raw EDN value v, return the live component.
+   :renderable values are built via the registry; all other keys pass through."
+  [k v renderer]
+  (case k
+    :renderable (make-renderable v renderer)
+    v))
+
+(defn- post-init-component!
+  "Any per-component work that requires a fully-initialised renderer.
+   Renderables that need pipeline building carry :pipeline-atom in their meta."
+  [k v renderer]
+  (when (and (= k :renderable)
+             (contains? (meta v) :pipeline-atom))
+    (build-triangle-pipeline! v renderer)))
+
+;; ---------------------------------------------------------------------------
+;; Entity loading
+;; ---------------------------------------------------------------------------
+
+(defn- load-entity
+  "Build a live Entity from an EDN entity map.
+   Components are instantiated eagerly; pipeline building is deferred to
+   post-init-entity! which runs after Vulkan is ready."
+  [ent-cfg renderer]
+  (let [id         (or (:id ent-cfg) (keyword (gensym "entity-")))
+        ;; All keys except :id are treated as component entries
+        comp-cfgs  (dissoc ent-cfg :id)
+        components (reduce-kv
+                     (fn [m k v]
+                       (assoc m k (instantiate-component k v renderer)))
+                     {}
+                     comp-cfgs)]
+    (entity/make id components)))
+
+(defn- post-init-entity!
+  "Run any deferred per-component init (e.g. pipeline building) for a live entity."
+  [ent renderer]
+  (doseq [[k v] (:components ent)]
+    (post-init-component! k v renderer)))
 
 ;; ---------------------------------------------------------------------------
 ;; Script resolution
@@ -119,43 +175,25 @@
 
 (defn load-game
   "Read an EDN file and return [game lifecycle].
-   Pass both to game/start!.
-
-   EDN format:
-     {:title  \"My Game\"
-      :width  1280
-      :height 720
-      :script my.game.script     ; optional namespace symbol
-      :renderables [{:type :triangle
-                     :shaders {:vert \"...\" :frag \"...\"}}]}"
+   Pass both to game/start!."
   [edn-path]
-  (let [cfg        (-> (slurp (io/file edn-path)) edn/read-string)
-        title      (or (:title cfg) "Spock")
-        width      (or (:width  cfg) 1280)
-        height     (or (:height cfg) 720)
-        script     (load-script (:script cfg))
-        g          (game/make-game title width height)
-        ;; Renderable configs — we build the actual renderables in on-init!
-        ;; once the renderer is ready.
-        rdbl-cfgs  (vec (:renderables cfg []))
-        ;; Atom to hold instantiated renderables after init
-        rdbls-atom (atom [])]
-
-    (log/log "edn/load-game:" edn-path "title=" title "renderables=" (count rdbl-cfgs))
-
+  (let [cfg       (-> (slurp (io/file edn-path)) edn/read-string)
+        title     (or (:title cfg) "Spock")
+        width     (or (:width  cfg) 1280)
+        height    (or (:height cfg) 720)
+        script    (load-script (:script cfg))
+        g         (game/make-game title width height)
+        ent-cfgs  (vec (:entities cfg []))]
+    (log/log "edn/load-game:" edn-path "title=" title "entities=" (count ent-cfgs))
     [g
      (reify game/GameLifecycle
        (on-init! [_this]
          (log/log "edn on-init!")
-         ;; Instantiate and pipeline-build all renderables now that renderer is up
          (let [r (:renderer g)]
-           (doseq [cfg rdbl-cfgs]
-             (let [rdbl (make-renderable cfg r)]
-               ;; Build pipeline for built-in types that need it
-               (when (= :triangle (:type cfg))
-                 (build-triangle-pipeline! rdbl r))
-               (game/add-renderable! g rdbl)
-               (swap! rdbls-atom conj rdbl))))
+           (doseq [cfg ent-cfgs]
+             (let [ent (load-entity cfg r)]
+               (post-init-entity! ent r)
+               (game/add-entity! g ent))))
          (when-let [f (:on-init script)]
            (f g)))
 
