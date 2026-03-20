@@ -8,3 +8,4 @@
 .clj-kondo/
 .lsp/
 .calva/
+*.log
