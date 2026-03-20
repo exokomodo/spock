@@ -7,7 +7,8 @@
 
    Usage (from a script):
      (spock.scene/swap! :menu)               ;; by name registered in game.edn
-     (spock.scene/swap! \"scenes/menu.edn\")   ;; or direct path")
+     (spock.scene/swap! \"scenes/menu.edn\")   ;; or direct path"
+  (:refer-clojure :exclude [swap!]))
 
 ;; ---------------------------------------------------------------------------
 ;; Scene record
@@ -28,12 +29,12 @@
 (defn add-entity!
   "Add an entity to the scene's entity list."
   [^Scene scene ent]
-  (swap! (:entities scene) conj ent))
+  (clojure.core/swap! (:entities scene) conj ent))
 
 (defn remove-entity!
   "Remove entity by id."
   [^Scene scene id]
-  (swap! (:entities scene) (fn [es] (vec (remove #(= (:id %) id) es)))))
+  (clojure.core/swap! (:entities scene) (fn [es] (vec (remove #(= (:id %) id) es)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Pending swap
