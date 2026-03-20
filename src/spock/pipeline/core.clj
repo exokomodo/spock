@@ -113,8 +113,8 @@
 
               ;; ---- dynamic state ----
               (let [dyn-states (doto (.mallocInt stack 2)
-                                 (.put 0 VK10/VK_DYNAMIC_STATE_VIEWPORT)
-                                 (.put 1 VK10/VK_DYNAMIC_STATE_SCISSOR)
+                         (.put VK10/VK_DYNAMIC_STATE_VIEWPORT)
+                         (.put VK10/VK_DYNAMIC_STATE_SCISSOR)
                                  (.flip))
                     dyn (VkPipelineDynamicStateCreateInfo/calloc stack)]
                 (.sType dyn VK10/VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO)

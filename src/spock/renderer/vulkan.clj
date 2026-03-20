@@ -191,7 +191,7 @@
         gf   (int (:graphics-family @state))
         pf   (int (:present-family @state))
         uq   (distinct [gf pf])
-        prio (doto (.mallocFloat stack 1) (.put 0 1.0) (.flip))
+  prio (doto (.mallocFloat stack 1) (.put 1.0) (.flip))
         qcis (VkDeviceQueueCreateInfo/callocStack (count uq) stack)
         _    (dorun (map-indexed
                       (fn [idx fam]
@@ -243,7 +243,8 @@
 
 (defn- choose-extent [^VkSurfaceCapabilitiesKHR caps w h]
   (let [cur (.currentExtent caps)]
-    (if (not= (int (.width cur)) Integer/MAX_VALUE)
+    ;; Vulkan uses UINT32_MAX (0xFFFFFFFF, exposed as -1 in signed int) for undefined extent.
+    (if (not= (int (.width cur)) -1)
       {:width (.width cur) :height (.height cur)}
       {:width  (clamp w (.width  (.minImageExtent caps)) (.width  (.maxImageExtent caps)))
        :height (clamp h (.height (.minImageExtent caps)) (.height (.maxImageExtent caps)))})))
@@ -291,7 +292,7 @@
         _     (if (= gf pf)
                 (.imageSharingMode ci VK10/VK_SHARING_MODE_EXCLUSIVE)
                 (let [qfb (doto (.mallocInt stack 2)
-                            (.put 0 gf) (.put 1 pf) (.flip))]
+                            (.put gf) (.put pf) (.flip))]
                   (doto ci
                     (.imageSharingMode VK10/VK_SHARING_MODE_CONCURRENT)
                     (.pQueueFamilyIndices qfb))))
@@ -541,7 +542,7 @@
         ia-sem (long (nth (:image-available @state) frame))
         rf-sem (long (nth (:render-finished @state) frame))
         ^VkCommandBuffer cb (nth (:command-buffers @state) frame)
-        fl     (doto (.mallocLong stack 1) (.put 0 fence) (.flip))
+  fl     (doto (.mallocLong stack 1) (.put fence) (.flip))
         ip     (.mallocInt stack 1)]
     (VK10/vkWaitForFences dev fl true Long/MAX_VALUE)
     (let [res (KHRSwapchain/vkAcquireNextImageKHR
@@ -553,11 +554,11 @@
         (VK10/vkResetFences dev fence)
         (VK10/vkResetCommandBuffer cb 0)
         (record-command-buffer! state cb img-idx renderables)
-        (let [ws  (doto (.mallocLong stack 1) (.put 0 ia-sem) (.flip))
-              ss  (doto (.mallocLong stack 1) (.put 0 rf-sem) (.flip))
+          (let [ws  (doto (.mallocLong stack 1) (.put ia-sem) (.flip))
+            ss  (doto (.mallocLong stack 1) (.put rf-sem) (.flip))
               wst (doto (.mallocInt  stack 1)
-                    (.put 0 VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) (.flip))
-              cbp (doto (.mallocPointer stack 1) (.put 0 (.address cb)) (.flip))
+              (.put VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT) (.flip))
+            cbp (doto (.mallocPointer stack 1) (.put (.address cb)) (.flip))
               si  (doto (VkSubmitInfo/calloc stack)
                     (.sType VK10/VK_STRUCTURE_TYPE_SUBMIT_INFO)
                     (.waitSemaphoreCount 1)
@@ -567,8 +568,8 @@
                     (.pSignalSemaphores ss))]
           (vk-check (VK10/vkQueueSubmit ^VkQueue (:graphics-queue @state) si fence)
                      "vkQueueSubmit failed")
-          (let [scb (doto (.mallocLong stack 1) (.put 0 (long (:swapchain @state))) (.flip))
-                iib (doto (.mallocInt  stack 1) (.put 0 (int img-idx)) (.flip))
+            (let [scb (doto (.mallocLong stack 1) (.put (long (:swapchain @state))) (.flip))
+              iib (doto (.mallocInt  stack 1) (.put (int img-idx)) (.flip))
                 pi  (doto (VkPresentInfoKHR/calloc stack)
                       (.sType KHRSwapchain/VK_STRUCTURE_TYPE_PRESENT_INFO_KHR)
                       (.pWaitSemaphores ss)
