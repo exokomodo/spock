@@ -14,6 +14,8 @@
   renderable/Renderable
 
   (draw [this command-buffer device render-pass extent]
+    (when (empty? @pipeline-atom)
+      (println "[TriangleRenderable] draw called for first time"))
     ;; Lazily build the pipeline on first draw call
     (when (nil? (:pipeline @pipeline-atom))
       (println "[TriangleRenderable] building pipeline, shader-dir:" shader-dir)
@@ -34,6 +36,7 @@
     (let [{:keys [pipeline layout]} @pipeline-atom]
       (if (and pipeline layout)
         (do
+          (println "[TriangleRenderable] vkCmdBindPipeline + vkCmdDraw")
           (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
             ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
             org.lwjgl.vulkan.VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
