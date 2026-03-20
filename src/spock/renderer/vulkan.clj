@@ -2,7 +2,7 @@
   "Vulkan backend implementing spock.renderer.core/Renderer."
   (:require [spock.renderer.core :as renderer]
             [spock.renderable.core :as renderable])
-  (:import [org.lwjgl.system MemoryStack]
+  (:import [org.lwjgl.system MemoryStack MemoryUtil]
            [org.lwjgl PointerBuffer]
            [org.lwjgl.vulkan
             VK13 VK10
@@ -13,6 +13,10 @@
             VkSurfaceCapabilitiesKHR VkSurfaceFormatKHR
             VkSwapchainCreateInfoKHR
             VkImageViewCreateInfo
+            VkImageCreateInfo VkMemoryAllocateInfo VkMemoryRequirements
+            VkPhysicalDeviceMemoryProperties
+            VkImageMemoryBarrier
+            VkImageBlit VkImageSubresourceLayers VkOffset3D
             VkRenderPassCreateInfo
             VkAttachmentDescription VkAttachmentReference
             VkSubpassDescription VkSubpassDependency
@@ -23,7 +27,10 @@
             VkSubmitInfo VkPresentInfoKHR
             VkClearValue VkOffset2D VkExtent2D VkViewport VkRect2D
             KHRSurface KHRSwapchain]
-           [org.lwjgl.glfw GLFW GLFWVulkan])
+           [org.lwjgl.glfw GLFW GLFWVulkan]
+           [org.jcodec.api.awt AWTSequenceEncoder]
+           [java.awt.image BufferedImage]
+           [java.io File])
 )
 
 ;; ---------------------------------------------------------------------------
@@ -67,7 +74,9 @@
    :window-handle    nil       ; long (GLFW window)
    :width            1280
    :height           720
-   :title            "Spock"})
+   :title            "Spock"
+   ;; Recording state (nil when not recording)
+   :recording        nil})
 
 ;; ---------------------------------------------------------------------------
 ;; Helpers
@@ -532,6 +541,259 @@
     (MemoryStack/stackPop)))
 
 ;; ---------------------------------------------------------------------------
+;; Recording — staging image + jcodec
+;; ---------------------------------------------------------------------------
+
+(defn- find-memory-type
+  "Return the memory-type index satisfying type-filter bits and required properties."
+  [^VkPhysicalDevice pd ^long type-filter ^long props]
+  (let [^MemoryStack stack (MemoryStack/stackPush)
+        mp (VkPhysicalDeviceMemoryProperties/calloc stack)]
+    (VK10/vkGetPhysicalDeviceMemoryProperties pd mp)
+    (let [result (some (fn [^long i]
+                         (when (and (not= 0 (bit-and type-filter (bit-shift-left 1 i)))
+                                    (= props (bit-and (.propertyFlags (.memoryTypes mp i)) props)))
+                           i))
+                       (range (.memoryTypeCount mp)))]
+      (MemoryStack/stackPop)
+      (or result (throw (RuntimeException. "No suitable memory type found"))))))
+
+(defn- alloc-staging-image!
+  "Allocate a LINEAR, HOST_VISIBLE image for readback.
+   Returns {:image long :memory long :width int :height int}."
+  [state]
+  (let [^MemoryStack stack  (MemoryStack/stackPush)
+        ^VkDevice    dev    (:device @state)
+        ^VkPhysicalDevice pd (:physical-device @state)
+        ext   (:swapchain-extent @state)
+        w     (int (:width ext))
+        h     (int (:height ext))
+        fmt   (int (:swapchain-format @state))
+        ci    (doto (VkImageCreateInfo/calloc stack)
+                (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
+                (.imageType VK10/VK_IMAGE_TYPE_2D)
+                (.format fmt)
+                (.mipLevels 1)
+                (.arrayLayers 1)
+                (.samples VK10/VK_SAMPLE_COUNT_1_BIT)
+                (.tiling VK10/VK_IMAGE_TILING_LINEAR)
+                (.usage VK10/VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+                (.sharingMode VK10/VK_SHARING_MODE_EXCLUSIVE)
+                (.initialLayout VK10/VK_IMAGE_LAYOUT_UNDEFINED))
+        _     (doto (.extent ci) (.width w) (.height h) (.depth 1))
+        lp    (.mallocLong stack 1)
+        _     (vk-check (VK10/vkCreateImage dev ci nil lp) "vkCreateImage (staging) failed")
+        img   (.get lp 0)
+        mr    (VkMemoryRequirements/calloc stack)
+        _     (VK10/vkGetImageMemoryRequirements dev img mr)
+        mt    (find-memory-type pd
+                (.memoryTypeBits mr)
+                (bit-or VK10/VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                        VK10/VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+        ai    (doto (VkMemoryAllocateInfo/calloc stack)
+                (.sType VK10/VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
+                (.allocationSize (.size mr))
+                (.memoryTypeIndex (int mt)))
+        _     (vk-check (VK10/vkAllocateMemory dev ai nil lp) "vkAllocateMemory (staging) failed")
+        mem   (.get lp 0)
+        _     (vk-check (VK10/vkBindImageMemory dev img mem 0) "vkBindImageMemory (staging) failed")]
+    (MemoryStack/stackPop)
+    {:image img :memory mem :width w :height h}))
+
+(defn- free-staging-image! [state {:keys [image memory]}]
+  (let [^VkDevice dev (:device @state)]
+    (VK10/vkDestroyImage  dev (long image)  nil)
+    (VK10/vkFreeMemory    dev (long memory) nil)))
+
+(defn- transition-image-layout!
+  "Insert a pipeline barrier to transition image layout."
+  [^VkCommandBuffer cb image
+   old-layout new-layout
+   src-stage dst-stage
+   src-access dst-access]
+  (let [^MemoryStack stack (MemoryStack/stackPush)
+        barrier (doto (VkImageMemoryBarrier/callocStack 1 stack)
+                  (-> (.get 0)
+                      (doto (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER)
+                            (.oldLayout old-layout)
+                            (.newLayout new-layout)
+                            (.srcQueueFamilyIndex VK10/VK_QUEUE_FAMILY_IGNORED)
+                            (.dstQueueFamilyIndex VK10/VK_QUEUE_FAMILY_IGNORED)
+                            (.image image))))]
+    (doto (-> barrier (.get 0) .subresourceRange)
+      (.aspectMask VK10/VK_IMAGE_ASPECT_COLOR_BIT)
+      (.baseMipLevel 0)
+      (.levelCount 1)
+      (.baseArrayLayer 0)
+      (.layerCount 1))
+    (-> barrier (.get 0) (.srcAccessMask src-access))
+    (-> barrier (.get 0) (.dstAccessMask dst-access))
+    (VK10/vkCmdPipelineBarrier cb src-stage dst-stage 0 nil nil barrier)
+    (MemoryStack/stackPop)))
+
+(defn- blit-swapchain-to-staging!
+  "Record commands to blit the current swapchain image into the staging image.
+   Both images must already be transitioned to the correct layouts before this call."
+  [^VkCommandBuffer cb src-image dst-image w h]
+  (let [^MemoryStack stack (MemoryStack/stackPush)
+        blit (VkImageBlit/callocStack 1 stack)
+        b    (.get blit 0)]
+    (doto (.srcSubresource b)
+      (.aspectMask VK10/VK_IMAGE_ASPECT_COLOR_BIT)
+      (.mipLevel 0)
+      (.baseArrayLayer 0)
+      (.layerCount 1))
+    (doto (.srcOffsets b)
+      (-> (.get 0) (.set 0 0 0))
+      (-> (.get 1) (.set w h 1)))
+    (doto (.dstSubresource b)
+      (.aspectMask VK10/VK_IMAGE_ASPECT_COLOR_BIT)
+      (.mipLevel 0)
+      (.baseArrayLayer 0)
+      (.layerCount 1))
+    (doto (.dstOffsets b)
+      (-> (.get 0) (.set 0 0 0))
+      (-> (.get 1) (.set w h 1)))
+    (VK10/vkCmdBlitImage
+      cb
+      src-image VK10/VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+      dst-image VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+      blit
+      VK10/VK_FILTER_NEAREST)
+    (MemoryStack/stackPop)))
+
+(defn- read-staging-pixels!
+  "Map the staging image memory and read pixels into a BufferedImage.
+   Handles BGRA → RGB conversion. Uses heap allocations (not MemoryStack)
+   since this is called from within an existing stack frame."
+  [state {:keys [image memory width height]}]
+  (let [^VkDevice dev (:device @state)
+        ;; Heap-allocated structs — safe to use inside a nested call
+        sl (org.lwjgl.vulkan.VkSubresourceLayout/calloc)
+        sr (doto (org.lwjgl.vulkan.VkImageSubresource/calloc)
+             (.aspectMask VK10/VK_IMAGE_ASPECT_COLOR_BIT)
+             (.mipLevel 0)
+             (.arrayLayer 0))
+        _  (VK10/vkGetImageSubresourceLayout dev (long image) sr sl)
+        row-pitch (long (.rowPitch sl))
+        total     (long (.size sl))
+        pp        (MemoryUtil/memAllocPointer 1)]
+    (try
+      (vk-check (VK10/vkMapMemory dev (long memory) 0 total 0 pp) "vkMapMemory failed")
+      (let [ptr  (.get pp 0)
+            bimg (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
+            ;; Copy all pixels into a Java int[] first, then set in bulk.
+            ;; Avoids per-pixel JNI calls after unmap.
+            pixels (int-array (* width height))]
+        (dotimes [y height]
+          (dotimes [x width]
+            (let [off (+ (* (long y) row-pitch) (* (long x) 4))
+                  b   (bit-and 0xFF (MemoryUtil/memGetByte (+ ptr off)))
+                  g   (bit-and 0xFF (MemoryUtil/memGetByte (+ ptr (+ off 1))))
+                  r   (bit-and 0xFF (MemoryUtil/memGetByte (+ ptr (+ off 2))))
+                  rgb (bit-or (bit-shift-left r 16)
+                              (bit-shift-left g 8)
+                              b)]
+              (aset pixels (+ (* y width) x) (int rgb)))))
+        (VK10/vkUnmapMemory dev (long memory))
+        (.setRGB bimg 0 0 width height pixels 0 width)
+        bimg)
+      (finally
+        (MemoryUtil/memFree pp)
+        (.free sl)
+        (.free sr)))))
+
+(defn- capture-frame-to-encoder!
+  "Blit the current swapchain image to the staging image, read pixels,
+   and encode one frame. img-idx is the swapchain image index just rendered.
+   No-ops if recording has already been stopped."
+  [state img-idx]
+  (when-let [{:keys [encoder staging]} (:recording @state)]
+    (let [^MemoryStack stack (MemoryStack/stackPush)
+          ^VkDevice dev      (:device @state)
+          gq  ^org.lwjgl.vulkan.VkQueue (:graphics-queue @state)
+          pool (long (:command-pool @state))
+          src-image (long (nth (:swapchain-images @state) img-idx))
+          {:keys [image width height]} staging
+          dst-image (long image)
+
+          ;; Allocate a one-shot command buffer
+          ai  (doto (VkCommandBufferAllocateInfo/calloc stack)
+                (.sType VK10/VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO)
+                (.commandPool pool)
+                (.level VK10/VK_COMMAND_BUFFER_LEVEL_PRIMARY)
+                (.commandBufferCount 1))
+          pp  (.mallocPointer stack 1)
+          _   (vk-check (VK10/vkAllocateCommandBuffers dev ai pp) "alloc capture cb failed")
+          cb  (VkCommandBuffer. (.get pp 0) dev)
+          bi  (doto (VkCommandBufferBeginInfo/calloc stack)
+                (.sType VK10/VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO)
+                (.flags VK10/VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT))
+          _   (VK10/vkBeginCommandBuffer cb bi)]
+
+      ;; Transition swapchain image: PRESENT_SRC → TRANSFER_SRC
+      (transition-image-layout! cb src-image
+        KHRSwapchain/VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        VK10/VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+        VK10/VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+        VK10/VK_PIPELINE_STAGE_TRANSFER_BIT
+        0
+        VK10/VK_ACCESS_TRANSFER_READ_BIT)
+
+      ;; Transition staging image: UNDEFINED → TRANSFER_DST
+      (transition-image-layout! cb dst-image
+        VK10/VK_IMAGE_LAYOUT_UNDEFINED
+        VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        VK10/VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
+        VK10/VK_PIPELINE_STAGE_TRANSFER_BIT
+        0
+        VK10/VK_ACCESS_TRANSFER_WRITE_BIT)
+
+      ;; Blit
+      (blit-swapchain-to-staging! cb src-image dst-image width height)
+
+      ;; Transition staging: TRANSFER_DST → GENERAL (host readable)
+      (transition-image-layout! cb dst-image
+        VK10/VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+        VK10/VK_IMAGE_LAYOUT_GENERAL
+        VK10/VK_PIPELINE_STAGE_TRANSFER_BIT
+        VK10/VK_PIPELINE_STAGE_HOST_BIT
+        VK10/VK_ACCESS_TRANSFER_WRITE_BIT
+        VK10/VK_ACCESS_HOST_READ_BIT)
+
+      ;; Transition swapchain back: TRANSFER_SRC → PRESENT_SRC
+      (transition-image-layout! cb src-image
+        VK10/VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+        KHRSwapchain/VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        VK10/VK_PIPELINE_STAGE_TRANSFER_BIT
+        VK10/VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT
+        VK10/VK_ACCESS_TRANSFER_READ_BIT
+        0)
+
+      (vk-check (VK10/vkEndCommandBuffer cb) "end capture cb failed")
+
+      ;; Submit and wait
+      (let [cbp (doto (.mallocPointer stack 1) (.put (.address cb)) (.flip))
+            si  (doto (VkSubmitInfo/calloc stack)
+                  (.sType VK10/VK_STRUCTURE_TYPE_SUBMIT_INFO)
+                  (.pCommandBuffers cbp))]
+        (vk-check (VK10/vkQueueSubmit gq si VK_NULL) "submit capture cb failed")
+        (VK10/vkQueueWaitIdle gq))
+
+      ;; Read pixels and post to async encode queue (non-blocking offer).
+      ;; If the queue is full we drop the frame rather than stall the render thread.
+      (let [bimg (read-staging-pixels! state staging)
+            q    (:frame-q (:recording @state))]
+        (when q (.offer ^java.util.concurrent.LinkedBlockingQueue q bimg)))
+
+      ;; Free one-shot command buffer
+      (let [cbp (doto (.mallocPointer stack 1) (.put (.address cb)) (.flip))]
+        (VK10/vkFreeCommandBuffers dev pool cbp))
+
+      (MemoryStack/stackPop))))
+
+
+;; ---------------------------------------------------------------------------
 ;; Frame render
 ;; ---------------------------------------------------------------------------
 (defn- render-frame! [state renderables]
@@ -576,9 +838,15 @@
                       (.swapchainCount 1)
                       (.pSwapchains scb)
                       (.pImageIndices iib))]
-            (KHRSwapchain/vkQueuePresentKHR ^VkQueue (:present-queue @state) pi)))))
+            (KHRSwapchain/vkQueuePresentKHR ^VkQueue (:present-queue @state) pi)
+            ;; Capture frame for recording (if active).
+            ;; Check inside the present call so we don't encode after stop-recording!.
+            (when-let [rec (:recording @state)]
+              (when (:encoder rec)
+                (capture-frame-to-encoder! state img-idx)))))))
     (swap! state update :current-frame #(mod (inc %) MAX-FRAMES))
     (MemoryStack/stackPop)))
+
 
 ;; ---------------------------------------------------------------------------
 ;; Cleanup
@@ -658,7 +926,10 @@
           (println "[VulkanRenderer] ExceptionInfo:" (.getMessage e)))
         false)
       (catch Exception e
-        (println "[VulkanRenderer] render! failed:" (.getMessage e))
+        ;; Suppress benign "muxer track has finished" noise from jcodec
+        ;; when the encoder races ahead of the last rendered frame.
+        (when-not (.contains (.getMessage e) "muxer track has finished")
+          (println "[VulkanRenderer] render! failed:" (.getMessage e)))
         false)))
 
   (cleanup! [_this]
@@ -670,7 +941,60 @@
   (set-clear-color! [_this color] (swap! state assoc :clear-color color))
   (get-extent [_this] (:swapchain-extent @state))
   (get-render-pass [_this] (:render-pass @state))
-  (get-device [_this] (:device @state)))
+  (get-device [_this] (:device @state))
+
+  (start-recording! [_this path fps]
+    (when (:recording @state)
+      (println "[VulkanRenderer] already recording; ignoring start-recording!"))
+    (when-not (:recording @state)
+      (try
+        (VK10/vkDeviceWaitIdle ^VkDevice (:device @state))
+        (let [staging (alloc-staging-image! state)
+              encoder (AWTSequenceEncoder/createSequenceEncoder
+                        (File. ^String path)
+                        (int fps))
+              ;; Async encode queue: render thread pushes BufferedImages here,
+              ;; encode thread drains it. Keeps render loop from blocking on jcodec.
+              frame-q  (java.util.concurrent.LinkedBlockingQueue. 8)
+              running? (volatile! true)
+              enc-thread (Thread.
+                           ^Runnable
+                           (fn []
+                             (loop []
+                               (let [frame (.poll frame-q 100 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                                 (cond
+                                   (instance? BufferedImage frame)
+                                   (do (try (.encodeImage encoder frame)
+                                            (catch Exception _ nil))
+                                       (recur))
+                                   @running?
+                                   (recur)))))
+                           "spock-encode")]
+          (.start enc-thread)
+          (swap! state assoc :recording {:encoder  encoder
+                                         :staging  staging
+                                         :frame-q  frame-q
+                                         :running? running?
+                                         :enc-thread enc-thread})
+          (println "[VulkanRenderer] recording started →" path))
+        (catch Exception e
+          (println "[VulkanRenderer] start-recording! failed:" (.getMessage e))
+          (.printStackTrace e)))))
+
+  (stop-recording! [_this]
+    (when-let [{:keys [^AWTSequenceEncoder encoder staging running? enc-thread]} (:recording @state)]
+      (try
+        ;; Signal render thread to stop posting frames, then drain the encode queue.
+        (vreset! running? false)
+        (.join ^Thread enc-thread 5000)
+        (VK10/vkDeviceWaitIdle ^VkDevice (:device @state))
+        (.finish encoder)
+        (free-staging-image! state staging)
+        (swap! state assoc :recording nil)
+        (println "[VulkanRenderer] recording stopped")
+        (catch Exception e
+          (println "[VulkanRenderer] stop-recording! failed:" (.getMessage e))
+          (.printStackTrace e))))))
 
 (defn make-vulkan-renderer
   ([]          (make-vulkan-renderer "Spock"))

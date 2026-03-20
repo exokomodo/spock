@@ -68,7 +68,7 @@
     (renderer/set-clear-color! (:renderer game) new-color)
     new-dirs))
 
-(defrecord HelloGame [g triangle dirs-atom]
+(defrecord HelloGame [g triangle dirs-atom record?]
   game/GameLifecycle
 
   (on-init! [_this]
@@ -77,6 +77,8 @@
                           "/examples/hello/shaders/")]
       (build-pipeline! triangle (:renderer g) shader-dir)
       (game/add-renderable! g triangle))
+    (when record?
+      (game/start-recording! g "recording.mp4" 30))
     (log/log "on-init! done"))
 
   (on-tick! [_this delta]
@@ -89,16 +91,19 @@
                           (assoc s :elapsed t)))))
 
   (on-done! [_this]
+    (when record?
+      (game/stop-recording! g))
     (log/log "on-done!")))
 
 ;; ---------------------------------------------------------------------------
 ;; Entry point
 ;; ---------------------------------------------------------------------------
-(defn -main [& _args]
+(defn -main [& args]
   (log/log "spock hello starting")
-  (let [g        (game/make-game "Hello Vulkan")
+  (let [record?  (some #{"--record"} args)
+        g        (game/make-game "Hello Vulkan")
         triangle (make-triangle-renderable)
-        lc       (->HelloGame g triangle (atom [0.1 0.2 0.3 0.0]))]
+        lc       (->HelloGame g triangle (atom [0.1 0.2 0.3 0.0]) (boolean record?))]
     (game/start! g lc))
   ;; LWJGL/AWT threads keep the JVM alive after start! returns.
   ;; Force-exit so closing the window (or pressing Escape) actually quits.

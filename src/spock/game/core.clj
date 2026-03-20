@@ -46,6 +46,17 @@
 (defn add-renderable! [game renderable]
   (swap! (:state game) update :renderables conj renderable))
 
+(defn start-recording!
+  "Begin recording rendered frames to path (mp4).
+   fps controls the playback frame rate. Call after the game is running."
+  ([game path]     (start-recording! game path 30))
+  ([game path fps] (renderer/start-recording! (:renderer game) path fps)))
+
+(defn stop-recording!
+  "Finalise the recording and flush to disk."
+  [game]
+  (renderer/stop-recording! (:renderer game)))
+
 ;; ---------------------------------------------------------------------------
 ;; GLFW helpers (main thread only)
 ;; ---------------------------------------------------------------------------

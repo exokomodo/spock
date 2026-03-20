@@ -14,7 +14,8 @@
     "Complete Vulkan init (device → sync objects). Called on the render thread.
      Surface must already exist. Returns true on success.")
   (render! [this renderables]
-    "Render one frame. renderables is a seq of Renderable.")
+    "Render one frame. renderables is a seq of Renderable.
+     If recording is active, captures the frame automatically.")
   (cleanup! [this]
     "Wait for GPU idle and release all resources.")
   (get-clear-color [this]
@@ -26,4 +27,12 @@
   (get-render-pass [this]
     "Return the VkRenderPass handle (long).")
   (get-device [this]
-    "Return the VkDevice."))
+    "Return the VkDevice.")
+  (start-recording! [this path fps]
+    "Begin recording frames to an MP4 file at path.
+     fps controls the playback frame rate of the output.
+     Allocates a host-visible staging image for readback.
+     Call on the render thread (after init!).")
+  (stop-recording! [this]
+    "Finalise the recording and free the staging image.
+     Call on the render thread."))

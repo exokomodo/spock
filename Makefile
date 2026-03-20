@@ -104,6 +104,13 @@ shaders/hello:
 .PHONY: hello
 hello: run/hello ## Run the hello example
 
+.PHONY: run/record
+run/record: shaders/hello
+	$(DISPLAY_PREFIX) lein record
+
+.PHONY: record
+record: run/record ## Run the hello example and record to recording.mp4 (native Vulkan capture, no display required)
+
 ##@ Utilities
 
 .PHONY: help

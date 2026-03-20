@@ -5,6 +5,9 @@
             :url "https://creativecommons.org/publicdomain/zero/1.0/"}
 
   :dependencies [[org.clojure/clojure "1.12.0"]
+                 ;; Pure-Java H.264 encoder — no native deps, works on any JVM/arch
+                 [org.jcodec/jcodec "0.2.5"]
+                 [org.jcodec/jcodec-javase "0.2.5"]
                  ;; LWJGL BOM — core + Vulkan + GLFW + OpenAL + natives
                  [org.lwjgl/lwjgl "3.3.4"]
                  [org.lwjgl/lwjgl-vulkan "3.3.4"]
@@ -48,4 +51,5 @@
 
 
   :aliases
-  {"hello" ["with-profile" "hello" "run"]})
+  {"hello"  ["with-profile" "hello" "run"]
+   "record" ["with-profile" "hello" "run" "--" "--record"]})
