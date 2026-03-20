@@ -283,6 +283,8 @@
                                    (.basePipelineIndex -1))))
           _  (.rewind lp)
           _  (let [r (VK10/vkCreateGraphicsPipelines device VK10/VK_NULL_HANDLE pipeline-buf nil lp)]
+               (println "[pipeline] vkCreateGraphicsPipelines result:" r
+                        "(SUCCESS=" VK10/VK_SUCCESS ")")
                (when (not= r VK10/VK_SUCCESS)
                  (VK10/vkDestroyPipelineLayout device layout nil)
                  (VK10/vkDestroyShaderModule device vert-mod nil)
@@ -295,6 +297,7 @@
       (VK10/vkDestroyShaderModule device vert-mod nil)
       (VK10/vkDestroyShaderModule device frag-mod nil)
       (MemoryStack/stackPop)
+      (println "[pipeline] built — pipeline:" pipeline "layout:" layout)
       {:pipeline pipeline
        :layout   layout
        :device   device})))
