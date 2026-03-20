@@ -48,8 +48,6 @@
 (defn- compute-vertices
   "Flat float array of (sides * 2) values for a regular N-gon, CCW winding."
   [sides radius]
-  (println "[polygon/compute-vertices] sides=" sides "type=" (type sides)
-           "radius=" radius "type=" (type radius))
   (let [n    (int sides)
         step (/ (* 2.0 Math/PI) n)]
     (float-array

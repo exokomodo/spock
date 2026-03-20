@@ -47,8 +47,8 @@
     (let [m (meta v)]
       (cond
         (contains? m :vert-path)  (spock.renderable.triangle/build-pipeline! v renderer)
-        (contains? m :vbuf-atom)  (spock.renderable.polygon/build-pipeline! v renderer)
-        (contains? m :image-path) (spock.renderable.sprite/build-pipeline!  v renderer)))))
+        (contains? m :image-path) (spock.renderable.sprite/build-pipeline!   v renderer)
+        (contains? m :vbuf-atom)  (spock.renderable.polygon/build-pipeline!  v renderer)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Entity loading
