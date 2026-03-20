@@ -92,4 +92,7 @@
   (let [g        (game/make-game "Hello Vulkan")
         triangle (make-triangle-renderable)
         lc       (->HelloGame g triangle (atom [0.1 0.2 0.3 0.0]))]
-    (game/start! g lc)))
+    (game/start! g lc))
+  ;; LWJGL/AWT threads keep the JVM alive after start! returns.
+  ;; Force-exit so closing the window (or pressing Escape) actually quits.
+  (System/exit 0))
