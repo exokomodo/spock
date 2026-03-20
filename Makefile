@@ -61,24 +61,29 @@ endif
 
 ##@ Development tools
 .PHONY: build
-build: ## Build the project
+build: build/shaders ## Build the project
 	lein compile
 
-.PHONY: build/shaders
-build/shaders: shaders/polygon ## Build engine shaders
+.PHONY: build/all
+build/all: build/shaders ## Compile examples
+	lein with-profile hello compile
+	lein with-profile spin-shooter compile
 
-.PHONY: shaders/polygon
-shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
+.PHONY: build/shaders
+build/shaders: build/shaders/polygon build/shaders/hello ## Build engine shaders
+
+.PHONY: build/shaders/hello
+build/shaders/hello:
+	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
+	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
+
+.PHONY: build/shaders/polygon
+build/shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
 	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
 	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
 
 .PHONY: check
-check: check/format check/compile ## Check code quality
-
-.PHONY: check/compile
-check/compile: ## Check code quality
-	lein with-profile edn compile
-	lein with-profile spin-shooter compile
+check: check/format ## Check code quality
 
 .PHONY: check/format
 check/format: ## Check code formatting with cljfmt
@@ -134,16 +139,11 @@ run/edn: shaders/hello ## EDN-driven game runner. Usage: make run/edn EDN=exampl
 	$(DISPLAY_PREFIX) lein edn $(EDN)
 
 .PHONY: run/hello
-run/hello: shaders/hello ## Run the hello example
+run/hello: build/shaders ## Run the hello example
 	$(DISPLAY_PREFIX) lein hello
 
-.PHONY: shaders/hello
-shaders/hello:
-	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
-	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
-
 .PHONY: run/spin-shooter
-run/spin-shooter: shaders/polygon ## Run the spin-shooter example
+run/spin-shooter: build/shaders ## Run the spin-shooter example
 	$(DISPLAY_PREFIX) lein spin-shooter
 
 .PHONY: edn

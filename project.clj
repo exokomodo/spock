@@ -32,15 +32,15 @@
 
   :profiles
   {:dev {:plugins [[lein-cljfmt "0.9.2"]]}
-   :edn {:main spock.main
-         :aot [spock.main]
-         :source-paths ["src" "examples" "examples/hello/scripts"]
-         :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
-                      (= "Mac OS X" (System/getProperty "os.name"))
-                      (conj "-XstartOnFirstThread"
-                            (str "-Dorg.lwjgl.vulkan.libname="
-                                 (or (System/getenv "VULKAN_LOADER")
-                                     "/usr/local/lib/libvulkan.1.dylib"))))}
+   :hello {:main spock.main
+           :aot [spock.main]
+           :source-paths ["src" "examples" "examples/hello/scripts"]
+           :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
+                        (= "Mac OS X" (System/getProperty "os.name"))
+                        (conj "-XstartOnFirstThread"
+                              (str "-Dorg.lwjgl.vulkan.libname="
+                                   (or (System/getenv "VULKAN_LOADER")
+                                       "/usr/local/lib/libvulkan.1.dylib"))))}
    :spin-shooter {:main spock.main
                   :aot [spock.main]
                   :source-paths ["src" "examples"]

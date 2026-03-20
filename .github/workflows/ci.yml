@@ -42,14 +42,9 @@ jobs:
         run: |
           make deps
 
-      - name: Compile (syntax check)
+      - name: Build project
         run: |
-          make check
-
-      - name: Compile shaders
-        run: |
-          make shaders/hello
-          make shaders/polygon
+          make build/all
 
       - name: Run tests
         run: |
