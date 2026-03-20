@@ -35,6 +35,14 @@ endif
 
 BIN_DIR ?= /usr/local/bin
 
+# macOS: LWJGL loads libvulkan.1.dylib directly via DYLD_LIBRARY_PATH.
+# The LunarG SDK installs it to /usr/local/lib by default.
+# Override VULKAN_LIB_DIR if your SDK is elsewhere.
+ifeq ($(OS),Darwin)
+  VULKAN_LIB_DIR ?= /usr/local/lib
+  export DYLD_LIBRARY_PATH := $(VULKAN_LIB_DIR):$(DYLD_LIBRARY_PATH)
+endif
+
 ##@ Setup environment
 
 .PHONY: setup
