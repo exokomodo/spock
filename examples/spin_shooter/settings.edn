@@ -1,0 +1,4 @@
+{:title  "Spin Shooter"
+ :width  800
+ :height 800
+ :vsync  true}

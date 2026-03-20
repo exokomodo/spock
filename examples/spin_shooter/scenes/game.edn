@@ -1,0 +1,31 @@
+{:script spin-shooter.scripts.game
+
+ ;; One renderable per "pool":
+ ;;   :planet  — the central circle (polygon with many sides ≈ circle)
+ ;;   :guns    — the gun triangles on the planet surface
+ ;;   :bullets — small fast projectiles
+ ;;   :enemies — enemy polygons approaching from outside
+ :entities
+ [{:id :planet-r
+   :renderable {:type   :polygon
+                :sides  32
+                :radius 0.08
+                :color  [0.3 0.7 1.0 1.0]}}
+
+  {:id :gun-r
+   :renderable {:type   :polygon
+                :sides  3
+                :radius 0.03
+                :color  [1.0 0.8 0.2 1.0]}}
+
+  {:id :bullet-r
+   :renderable {:type   :polygon
+                :sides  6
+                :radius 0.012
+                :color  [1.0 1.0 0.4 1.0]}}
+
+  {:id :enemy-r
+   :renderable {:type   :polygon
+                :sides  5
+                :radius 0.05
+                :color  [1.0 0.3 0.3 1.0]}}]}
