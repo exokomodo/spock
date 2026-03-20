@@ -75,6 +75,27 @@ test: ## Run tests
 run/hello: shaders/hello
 	$(DISPLAY_PREFIX) lein hello
 
+# screenrecord — capture the cage window to a file.
+# Requires cage and wf-recorder (wlroots-based screen capture for cage's Wayland compositor).
+# Requires LIBSEAT_BACKEND=seatd (seatd must be running) for headless/SSH use.
+# Usage: make screenrecord [OUTPUT=my-recording.mp4] [GEOMETRY=0,0 1920x1080]
+OUTPUT   ?= recording.mp4
+GEOMETRY ?= 0,0 1920x1080
+.PHONY: screenrecord
+screenrecord: shaders/hello ## Record the hello window via cage + wf-recorder (OUTPUT=recording.mp4)
+	$(if $(shell which cage 2>/dev/null),,$(error cage is required for screenrecord but was not found))
+	$(if $(shell which wf-recorder 2>/dev/null),,$(error wf-recorder is required for screenrecord but was not found))
+	@echo "Recording to $(OUTPUT)…"
+	LIBSEAT_BACKEND=seatd \
+	WLR_NO_HARDWARE_CURSORS=1 \
+	WLR_DRM_DEVICES=/dev/dri/card1 \
+	cage -- sh -c '\
+		wf-recorder --codec libx264 -g "$(GEOMETRY)" -f "$(OUTPUT)" & WF_PID=$$!; \
+		sleep 2; \
+		lein hello; \
+		kill -INT $$WF_PID; \
+		wait $$WF_PID 2>/dev/null || true'
+
 .PHONY: shaders/hello
 shaders/hello:
 	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv

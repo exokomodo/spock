@@ -6,7 +6,8 @@
             [spock.renderer.core   :as renderer]
             [spock.pipeline.core   :as pipeline]
             [spock.log             :as log])
-  (:import [org.lwjgl.vulkan VkCommandBuffer VK10])
+  (:import [org.lwjgl.glfw GLFW]
+           [org.lwjgl.vulkan VkCommandBuffer VK10])
   (:gen-class))
 
 ;; ---------------------------------------------------------------------------
@@ -79,7 +80,13 @@
     (log/log "on-init! done"))
 
   (on-tick! [_this delta]
-    (swap! dirs-atom #(update-clear-color! g delta %)))
+    (swap! dirs-atom #(update-clear-color! g delta %))
+    ;; Auto-close after 5 seconds.
+    (swap! (:state g) (fn [s]
+                        (let [t (+ (get s :elapsed 0.0) delta)]
+                          (when (>= t 5.0)
+                            (GLFW/glfwSetWindowShouldClose (:window s) true))
+                          (assoc s :elapsed t)))))
 
   (on-done! [_this]
     (log/log "on-done!")))
@@ -92,4 +99,7 @@
   (let [g        (game/make-game "Hello Vulkan")
         triangle (make-triangle-renderable)
         lc       (->HelloGame g triangle (atom [0.1 0.2 0.3 0.0]))]
-    (game/start! g lc)))
+    (game/start! g lc))
+  ;; LWJGL/AWT threads keep the JVM alive after start! returns.
+  ;; Force-exit so closing the window (or pressing Escape) actually quits.
+  (System/exit 0))
