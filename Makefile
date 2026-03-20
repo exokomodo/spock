@@ -56,7 +56,7 @@ setup/glslc: ## Install glslc shader compiler (macOS: brew; Linux: apt)
 ifeq ($(OS),Darwin)
 	brew install glslang
 else
-	sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends glslang-tools
+	sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends glslc
 endif
 
 ##@ Development tools
