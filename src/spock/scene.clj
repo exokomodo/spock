@@ -17,12 +17,15 @@
 (defrecord Scene [id       ;; keyword name, e.g. :hello
                   path     ;; file path the scene was loaded from
                   entities ;; atom — current live entity list
-                  script]) ;; namespace symbol or nil
+                  script   ;; namespace symbol or nil
+                  config]) ;; raw EDN config map for this scene
 
 (defn make
   "Create a Scene. entities is wrapped in an atom if not already one."
-  [id path entities script]
-  (->Scene id path (atom (vec entities)) script))
+  ([id path entities script]
+   (->Scene id path (atom (vec entities)) script {}))
+  ([id path entities script config]
+   (->Scene id path (atom (vec entities)) script config)))
 
 (defn get-entities [^Scene scene] @(:entities scene))
 

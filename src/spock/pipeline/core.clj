@@ -6,9 +6,13 @@
            [org.lwjgl.vulkan
             VK10
             VkDevice
+            VkCommandBuffer
             VkGraphicsPipelineCreateInfo
             VkPipelineShaderStageCreateInfo
             VkPipelineVertexInputStateCreateInfo
+            VkPipelineVertexInputStateCreateInfo
+            VkVertexInputBindingDescription
+            VkVertexInputAttributeDescription
             VkPipelineInputAssemblyStateCreateInfo
             VkPipelineViewportStateCreateInfo
             VkPipelineDynamicStateCreateInfo
@@ -17,30 +21,47 @@
             VkPipelineColorBlendStateCreateInfo
             VkPipelineColorBlendAttachmentState
             VkPipelineLayoutCreateInfo
+            VkPushConstantRange
             VkShaderModuleCreateInfo]))
 
 ;; ---------------------------------------------------------------------------
 ;; Builder constructor
 ;; ---------------------------------------------------------------------------
 (defn builder [^VkDevice device render-pass]
-  {:device       device
-   :render-pass  render-pass
-   :vert-spv     nil
-   :frag-spv     nil
-   :topology     VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
-   :cull-mode    VK10/VK_CULL_MODE_NONE
-   :front-face   VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE
-   :polygon-mode VK10/VK_POLYGON_MODE_FILL})
+  {:device             device
+   :render-pass        render-pass
+   :vert-spv           nil
+   :frag-spv           nil
+   :topology           VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+   :cull-mode          VK10/VK_CULL_MODE_NONE
+   :front-face         VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE
+   :polygon-mode       VK10/VK_POLYGON_MODE_FILL
+   :push-constant-size nil  ; bytes, nil = no push constants
+   ;; vertex input: nil = no vertex buffers (hardcoded in shader)
+   ;; non-nil: {:stride N :attributes [{:location L :format F :offset O} ...]}
+   :vertex-input       nil})
 
 ;; ---------------------------------------------------------------------------
 ;; Option setters
 ;; ---------------------------------------------------------------------------
 (defn vert-spv    [cfg buf]  (assoc cfg :vert-spv buf))
 (defn frag-spv    [cfg buf]  (assoc cfg :frag-spv buf))
-(defn topology    [cfg t]    (assoc cfg :topology    (case t :triangle-list VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST t)))
+(defn topology    [cfg t]    (assoc cfg :topology    (case t :triangle-list VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST :triangle-fan VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN :line-strip VK10/VK_PRIMITIVE_TOPOLOGY_LINE_STRIP :point-list VK10/VK_PRIMITIVE_TOPOLOGY_POINT_LIST t)))
 (defn cull-mode   [cfg m]    (assoc cfg :cull-mode   (case m :none VK10/VK_CULL_MODE_NONE :back VK10/VK_CULL_MODE_BACK_BIT :front VK10/VK_CULL_MODE_FRONT_BIT m)))
 (defn front-face  [cfg f]    (assoc cfg :front-face  (case f :clockwise VK10/VK_FRONT_FACE_CLOCKWISE :counter-clockwise VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE f)))
 (defn polygon-mode [cfg m]   (assoc cfg :polygon-mode (case m :fill VK10/VK_POLYGON_MODE_FILL :line VK10/VK_POLYGON_MODE_LINE m)))
+
+(defn push-constant-size
+  "Configure a VK_SHADER_STAGE_VERTEX_BIT push constant range of size-bytes."
+  [cfg size-bytes]
+  (assoc cfg :push-constant-size (int size-bytes)))
+
+(defn vertex-input
+  "Configure vertex input for a packed interleaved vertex buffer.
+   stride — stride in bytes between vertices.
+   attributes — vector of {:location int :format VkFormat-int :offset int}."
+  [cfg stride attributes]
+  (assoc cfg :vertex-input {:stride stride :attributes attributes}))
 
 (defn vert-path [cfg path]
   (when-not (shader/compile-glsl path)
@@ -71,7 +92,8 @@
 ;; ---------------------------------------------------------------------------
 (defn build! [{:keys [^VkDevice device render-pass
                       vert-spv frag-spv
-                      topology cull-mode front-face polygon-mode]}]
+                      topology cull-mode front-face polygon-mode
+                      push-constant-size vertex-input]}]
   (when-not vert-spv (throw (RuntimeException. "No vertex shader")))
   (when-not frag-spv (throw (RuntimeException. "No fragment shader")))
 
@@ -97,7 +119,26 @@
         ;; ---- vertex input ----
         (let [vi (VkPipelineVertexInputStateCreateInfo/calloc stack)]
           (.sType vi VK10/VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
-          ;; no vertex buffers — hardcoded in shader
+          (when vertex-input
+            ;; Binding description: binding 0, per-vertex
+            (let [bd (VkVertexInputBindingDescription/calloc 1 stack)
+                  bd0 (.get bd 0)]
+              (.binding bd0 0)
+              (.stride bd0 (int (:stride vertex-input)))
+              (.inputRate bd0 VK10/VK_VERTEX_INPUT_RATE_VERTEX)
+              (.pVertexBindingDescriptions vi bd))
+            ;; Attribute descriptions
+            (let [attrs (:attributes vertex-input)
+                  ad (VkVertexInputAttributeDescription/calloc (count attrs) stack)]
+              (dorun (map-indexed
+                       (fn [i {:keys [location format offset]}]
+                         (let [a (.get ad (int i))]
+                           (.location a (int location))
+                           (.binding  a 0)
+                           (.format   a (int format))
+                           (.offset   a (int offset))))
+                       attrs))
+              (.pVertexAttributeDescriptions vi ad)))
 
           ;; ---- input assembly ----
           (let [ia (VkPipelineInputAssemblyStateCreateInfo/calloc stack)]
@@ -160,6 +201,14 @@
                           ;; ---- pipeline layout ----
                           (let [layout-ci (VkPipelineLayoutCreateInfo/calloc stack)]
                             (.sType layout-ci VK10/VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+                            ;; Optional push constant range
+                            (when push-constant-size
+                              (let [pcr (VkPushConstantRange/calloc 1 ^MemoryStack stack)
+                                    r0  (.get pcr 0)]
+                                (.stageFlags r0 VK10/VK_SHADER_STAGE_VERTEX_BIT)
+                                (.offset     r0 0)
+                                (.size       r0 (int push-constant-size))
+                                (.pPushConstantRanges layout-ci pcr)))
                             (let [lp (.mallocLong stack 1)
                                   r  (VK10/vkCreatePipelineLayout device layout-ci nil lp)]
                               (when (not= r VK10/VK_SUCCESS)
@@ -200,6 +249,20 @@
         (VK10/vkDestroyShaderModule device vert-mod nil)
         (VK10/vkDestroyShaderModule device frag-mod nil)
         (MemoryStack/stackPop)))))
+
+;; ---------------------------------------------------------------------------
+;; push-constants!
+;; ---------------------------------------------------------------------------
+(defn push-constants!
+  "Record a vkCmdPushConstants call into command-buffer.
+   command-buffer — VkCommandBuffer
+   layout         — pipeline layout handle (long)
+   stage          — shader stage flags int (e.g. VK10/VK_SHADER_STAGE_VERTEX_BIT)
+   data           — java.nio.ByteBuffer of push constant data (position=0, limit=size)"
+  ([^VkCommandBuffer command-buffer layout stage ^java.nio.ByteBuffer data]
+   (push-constants! command-buffer layout stage 0 data))
+  ([^VkCommandBuffer command-buffer layout stage offset ^java.nio.ByteBuffer data]
+   (VK10/vkCmdPushConstants command-buffer (long layout) (int stage) (int offset) data)))
 
 ;; ---------------------------------------------------------------------------
 ;; destroy!

@@ -1,0 +1,7 @@
+{:script spin-shooter.scripts.gameover
+
+ ;; Automatically close the game after this many seconds.
+ ;; 0 = stay open indefinitely (useful for real deployments).
+ :auto-close-secs 5
+
+ :entities []}

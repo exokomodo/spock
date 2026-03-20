@@ -110,6 +110,19 @@ shaders/hello:
 	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
 	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
 
+.PHONY: shaders/polygon
+shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
+	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
+	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+
+.PHONY: run/spin-shooter
+run/spin-shooter: shaders/polygon ## Run the spin-shooter example
+	$(DISPLAY_PREFIX) lein spin-shooter
+
+
+.PHONY: spin-shooter
+spin-shooter: run/spin-shooter ## Run the spin-shooter example (alias)
+
 .PHONY: hello
 hello: run/hello ## Run the hello example
 
