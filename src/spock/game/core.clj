@@ -17,7 +17,8 @@
    - error-p   promise — render thread delivers any frame-loop exception here"
   (:require [spock.renderer.core :as renderer]
             [spock.renderer.vulkan :as vk]
-            [spock.entity :as entity])
+            [spock.entity :as entity]
+            [spock.input.core :as input])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -79,13 +80,10 @@
                  MemoryUtil/NULL)]
     (when (= window MemoryUtil/NULL)
       (throw (RuntimeException. "Failed to create GLFW window")))
-    (GLFW/glfwSetKeyCallback
-      window
-      (reify org.lwjgl.glfw.GLFWKeyCallbackI
-        (invoke [_ win key _sc action _mods]
-          (when (and (= key GLFW/GLFW_KEY_ESCAPE)
-                     (= action GLFW/GLFW_RELEASE))
-            (GLFW/glfwSetWindowShouldClose win true)))))
+    ;; Register generic input callbacks (key + mouse button + cursor position).
+    ;; input/register-callbacks! owns the GLFW key callback; escape-to-close is
+    ;; checked each tick via input/key-released? in the event loop below.
+    (input/register-callbacks! window)
     (swap! (:state game) assoc :window window)
     window))
 
@@ -152,6 +150,11 @@
           (when (realized? error-p)
             (throw @error-p))
           (GLFW/glfwPollEvents)
+          ;; Advance input state: :pressed→:held, :released→:none
+          (input/tick!)
+          ;; Engine-level Escape key closes the window
+          (when (input/key-released? :escape)
+            (GLFW/glfwSetWindowShouldClose window true))
           (let [now   (System/nanoTime)
                 delta (/ (double (- now last-t)) 1e9)]
             (on-tick! lifecycle delta)
