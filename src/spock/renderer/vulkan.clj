@@ -669,7 +669,9 @@
   (set-clear-color! [_this color] (swap! state assoc :clear-color color))
   (get-extent [_this] (:swapchain-extent @state))
   (get-render-pass [_this] (:render-pass @state))
-  (get-device [_this] (:device @state)))
+  (get-device [_this] (:device @state))
+  (get-command-pool [_this] (:command-pool @state))
+  (get-graphics-queue [_this] (:graphics-queue @state)))
 
 (defn make-vulkan-renderer
   ([]          (make-vulkan-renderer "Spock"))
