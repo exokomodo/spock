@@ -33,14 +33,14 @@ endif
 
 BIN_DIR ?= /usr/local/bin
 
-# macOS: LWJGL loads libvulkan.1.dylib directly.
-# DYLD_LIBRARY_PATH is stripped by SIP before reaching the JVM, so we
-# use -Dorg.lwjgl.librarypath instead (passed via JVM_OPTS / project.clj).
-# The LunarG SDK installs libvulkan to /usr/local/lib by default.
-# Override VULKAN_LIB_DIR if your SDK is elsewhere.
+# macOS: point LWJGL at the Vulkan loader by full path using
+# -Dorg.lwjgl.vulkan.libname so we don't redirect all LWJGL native
+# library loading (which causes version conflicts with Homebrew's dylibs).
+# LunarG SDK installs the loader to /usr/local/lib/libvulkan.1.dylib.
+# Override VULKAN_LOADER if yours is elsewhere.
 ifeq ($(OS),Darwin)
-  VULKAN_LIB_DIR ?= /usr/local/lib
-  export JVM_OPTS := -Dorg.lwjgl.librarypath=$(VULKAN_LIB_DIR) $(JVM_OPTS)
+  VULKAN_LOADER ?= /usr/local/lib/libvulkan.1.dylib
+  export JVM_OPTS := -Dorg.lwjgl.vulkan.libname=$(VULKAN_LOADER) $(JVM_OPTS)
 endif
 
 ##@ Setup environment

@@ -39,8 +39,9 @@
            ;; LWJGL library path is set via JVM_OPTS in the Makefile on macOS;
            ;; the property below is a no-op on Linux.
            :jvm-opts ["-XstartOnFirstThread"
-                      ~(str "-Dorg.lwjgl.librarypath="
-                            (or (System/getenv "VULKAN_LIB_DIR") "/usr/local/lib"))]}}
+                      ~(str "-Dorg.lwjgl.vulkan.libname="
+                            (or (System/getenv "VULKAN_LOADER")
+                                "/usr/local/lib/libvulkan.1.dylib"))]}}
 
 
 
