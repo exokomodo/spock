@@ -24,12 +24,9 @@
             VkShaderModuleCreateInfo
             VkDescriptorSetLayoutBinding
             VkDescriptorSetLayoutCreateInfo
-            VkDescriptorSetLayout
             VkDescriptorPoolSize
             VkDescriptorPoolCreateInfo
-            VkDescriptorPool
             VkDescriptorSetAllocateInfo
-            VkDescriptorSet
             VkDescriptorImageInfo
             VkWriteDescriptorSet]))
 
