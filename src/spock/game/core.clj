@@ -99,7 +99,7 @@
 ;; ---------------------------------------------------------------------------
 (defn- render-thread-fn
   "Entry point for the render thread."
-  [game ready-p stop? error-p]
+  [game ready-p start-p stop? error-p]
   (let [r (:renderer game)
         window (:window @(:state game))
         w (:width game)
@@ -107,7 +107,15 @@
     (try
       (when-not (renderer/init! r window w h)
         (throw (RuntimeException. "Vulkan renderer init failed")))
+      ;; Signal Vulkan init done; main thread will call on-init! (which may
+      ;; submit GPU work like texture uploads) before delivering start-p.
       (deliver ready-p true)
+      ;; Wait for main thread to finish on-init! before entering the frame
+      ;; loop — this ensures no two threads submit to the graphics queue
+      ;; simultaneously during startup.
+      (let [start-val @start-p]
+        (when (instance? Exception start-val)
+          (throw start-val)))
       ;; Frame loop — extract renderables from entities each frame
       (loop []
         (when-not @stop?
@@ -133,8 +141,9 @@
         stop?   (volatile! false)
         ready-p (promise)
         error-p (promise)
+        start-p  (promise)
         render-t (Thread.
-                  ^Runnable (fn [] (render-thread-fn game ready-p stop? error-p))
+                  ^Runnable (fn [] (render-thread-fn game ready-p start-p stop? error-p))
                   "spock-render")]
     (try
       (renderer/create-surface! r window)
@@ -142,7 +151,10 @@
       (let [ready-val @ready-p]
         (when (instance? Exception ready-val)
           (throw ready-val)))
+      ;; on-init! may submit GPU work (texture uploads, pipeline builds).
+      ;; The render thread is paused on start-p during this window.
       (on-init! lifecycle)
+      (deliver start-p true)
       (swap! (:state game) assoc :running? true)
       (loop [last-t (System/nanoTime)]
         (when (and (:running? @(:state game))
