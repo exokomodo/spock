@@ -24,8 +24,8 @@
   :resource-paths ["resources"]
 
   :profiles
-  {:hello {:main spock.examples.hello.core
-           :aot [spock.examples.hello.core]
+  {:hello {:main hello.core
+           :aot [hello.core]
            :source-paths ["src" "examples"]}}
 
   :aliases

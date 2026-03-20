@@ -1,4 +1,4 @@
-(ns spock.examples.hello.core
+(ns hello.core
   "Hello Vulkan — triangle with animated clear color.
    Mirrors exokomodo/drakon examples/hello/main.cpp"
   (:require [spock.game.core     :as game]
