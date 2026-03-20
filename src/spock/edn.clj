@@ -13,6 +13,7 @@
   (:require [clojure.edn     :as edn]
             [clojure.java.io :as io]
             [spock.game.core  :as game]
+            [spock.entity     :as entity]
             [spock.renderable.core :as renderable]
             [spock.renderer.core   :as renderer]
             [spock.pipeline.core   :as pipeline]
@@ -138,24 +139,21 @@
         ;; Renderable configs — we build the actual renderables in on-init!
         ;; once the renderer is ready.
         rdbl-cfgs  (vec (:renderables cfg []))
-        ;; Atom to hold instantiated renderables after init
-        rdbls-atom (atom [])]
-
     (log/log "edn/load-game:" edn-path "title=" title "renderables=" (count rdbl-cfgs))
 
     [g
      (reify game/GameLifecycle
        (on-init! [_this]
          (log/log "edn on-init!")
-         ;; Instantiate and pipeline-build all renderables now that renderer is up
+         ;; Instantiate renderables and add them as entities
          (let [r (:renderer g)]
            (doseq [cfg rdbl-cfgs]
-             (let [rdbl (make-renderable cfg r)]
-               ;; Build pipeline for built-in types that need it
+             (let [rdbl (make-renderable cfg r)
+                   ent  (entity/make (keyword (or (:id cfg) (gensym "entity-")))
+                                     {:renderable rdbl})]
                (when (= :triangle (:type cfg))
                  (build-triangle-pipeline! rdbl r))
-               (game/add-renderable! g rdbl)
-               (swap! rdbls-atom conj rdbl))))
+               (game/add-entity! g ent))))
          (when-let [f (:on-init script)]
            (f g)))
 

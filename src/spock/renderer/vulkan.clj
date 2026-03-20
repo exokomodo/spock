@@ -590,16 +590,11 @@
     (KHRSwapchain/vkDestroySwapchainKHR dev (long (:swapchain @state)) nil)
     (swap! state assoc :framebuffers [] :swapchain-views [] :swapchain VK_NULL)))
 
-(defn- full-cleanup! [state renderables]
+(defn- full-cleanup! [state]
   (let [^VkDevice   dev  (:device @state)
         ^VkInstance inst (:instance @state)
         surf (long (:surface @state))]
     (VK10/vkDeviceWaitIdle dev)
-    ;; Clean up renderables before destroying the device
-    (doseq [r renderables]
-      (try (renderable/cleanup! r dev)
-           (catch Exception e
-             (println "[VulkanRenderer] renderable cleanup! failed:" (.getMessage e)))))
     (doseq [s (:image-available @state)]  (VK10/vkDestroySemaphore dev (long s) nil))
     (doseq [s (:render-finished @state)]  (VK10/vkDestroySemaphore dev (long s) nil))
     (doseq [f (:in-flight-fences @state)] (VK10/vkDestroyFence     dev (long f) nil))
@@ -666,8 +661,8 @@
         (println "[VulkanRenderer] render! failed:" (.getMessage e))
         false)))
 
-  (cleanup! [_this renderables]
-    (try (full-cleanup! state renderables)
+  (cleanup! [_this]
+    (try (full-cleanup! state)
          (catch Exception e
            (println "[VulkanRenderer] cleanup! failed:" (.getMessage e)))))
 
