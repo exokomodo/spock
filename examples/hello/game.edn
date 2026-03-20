@@ -5,6 +5,7 @@
  ;; Script namespace — contains on-init, on-tick, on-done
  :script hello.script
 
- :renderables [{:type    :triangle
-                :shaders {:vert "examples/hello/shaders/triangle.vert"
-                          :frag "examples/hello/shaders/triangle.frag"}}]}
+ :entities [{:id         :triangle
+             :renderable {:type    :triangle
+                          :shaders {:vert "examples/hello/shaders/triangle.vert"
+                                    :frag "examples/hello/shaders/triangle.frag"}}}]}
