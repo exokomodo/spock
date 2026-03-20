@@ -183,11 +183,11 @@
                              (.pName (.UTF8 stack "main" true)))))
 
           ;; Vertex input — no vertex buffers by default
+          ;; No vertex buffers — hardcoded vertices in shader.
+          ;; Counts are derived from buffer sizes; passing nil leaves them 0.
           vertex-input-ci (doto (VkPipelineVertexInputStateCreateInfo/calloc stack)
                             (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO)
-                            (.vertexBindingDescriptionCount 0)
                             (.pVertexBindingDescriptions nil)
-                            (.vertexAttributeDescriptionCount 0)
                             (.pVertexAttributeDescriptions nil))
 
           ;; Input assembly
