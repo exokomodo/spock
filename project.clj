@@ -31,7 +31,18 @@
   :resource-paths ["resources"]
 
   :profiles
-  {:edn   {:main spock.main
+  {;; dev profile — used by Calva jack-in and interactive development.
+   ;; Carries -XstartOnFirstThread on macOS so GLFW can run from the REPL
+   ;; session, and adds examples/ to the source path so hello.core is visible.
+   :dev   {:source-paths ["src" "examples"]
+           :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
+                        (= "Mac OS X" (System/getProperty "os.name"))
+                        (conj "-XstartOnFirstThread"
+                              (str "-Dorg.lwjgl.vulkan.libname="
+                                   (or (System/getenv "VULKAN_LOADER")
+                                       "/usr/local/lib/libvulkan.1.dylib"))))}
+
+   :edn   {:main spock.main
            :aot [spock.main]
            :source-paths ["src" "examples"]
            :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]

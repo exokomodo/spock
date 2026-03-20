@@ -1,5 +1,10 @@
 {
     "cSpell.words": [
         "lein"
-    ]
+    ],
+    // Calva jack-in: always use the :dev profile so -XstartOnFirstThread is
+    // applied on macOS and examples/ is on the source path.
+    // Without this, GLFW will fail to create a window from a REPL session on macOS.
+    "calva.jackInOptions": "with-profile dev",
+    "calva.myCljAliasesOrProfiles": ["dev"]
 }

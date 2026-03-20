@@ -17,7 +17,8 @@
    - error-p   promise — render thread delivers any frame-loop exception here"
   (:require [spock.renderer.core :as renderer]
             [spock.renderer.vulkan :as vk]
-            [spock.entity :as entity])
+            [spock.entity :as entity]
+            [spock.dispatch :as dispatch])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -152,6 +153,7 @@
           (when (realized? error-p)
             (throw @error-p))
           (GLFW/glfwPollEvents)
+          (dispatch/drain!)
           (let [now   (System/nanoTime)
                 delta (/ (double (- now last-t)) 1e9)]
             (on-tick! lifecycle delta)
