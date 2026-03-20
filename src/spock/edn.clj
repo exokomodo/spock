@@ -30,7 +30,15 @@
             [spock.renderable.core :as renderable]
             [spock.renderer.core   :as renderer]
             [spock.pipeline.core   :as pipeline]
-            [spock.log             :as log]))
+            [spock.log             :as log])
+  (:import [org.lwjgl.vulkan
+            VK10
+            VkBufferCreateInfo
+            VkMemoryRequirements
+            VkMemoryAllocateInfo
+            VkPhysicalDeviceMemoryProperties]
+           [org.lwjgl.system MemoryStack MemoryUtil]
+           [java.nio ByteBuffer ByteOrder]))
 
 ;; ---------------------------------------------------------------------------
 ;; Renderable registry
@@ -101,6 +109,212 @@
 (register-renderable! :triangle make-triangle-renderable)
 
 ;; ---------------------------------------------------------------------------
+;; Built-in renderable: :polygon
+;; ---------------------------------------------------------------------------
+
+;; Push constant layout for polygon shader (bytes, std430 / packed):
+;;   offset 0:  vec2  translation  (8 bytes)
+;;   offset 8:  float rotation     (4 bytes)
+;;   offset 12: (4 bytes padding to align vec4)
+;;   offset 16: vec4  color        (16 bytes)
+;;   total: 32 bytes
+;;
+;; NOTE: GLSL std140 packs push constants the same way for these types.
+;; vec2 = 8 bytes, float = 4 bytes, then vec4 must be 16-byte aligned → 4 bytes pad.
+(def ^:private ^:const PUSH_CONSTANT_BYTES 32)
+
+(defn- compute-polygon-vertices
+  "Return a flat float array of (sides * 2) floats for a regular N-gon,
+   center-origin, CCW winding, in NDC-friendly coords scaled by radius."
+  [sides radius]
+  (let [n (int sides)
+        step (/ (* 2.0 Math/PI) n)]
+    (float-array
+      (for [i (range n)
+            coord [:x :y]]
+        (let [angle (* i step)]
+          (case coord
+            :x (* (double radius) (Math/cos angle))
+            :y (* (double radius) (- (Math/sin angle)))))))))  ; flip Y for Vulkan
+
+;; Physical device is needed to find memory types. Accept it explicitly.
+(defn- find-memory-type
+  "Find a memory type index that satisfies type-filter and required-props flags."
+  [^org.lwjgl.vulkan.VkPhysicalDevice physical-device type-filter required-props]
+  (let [stack (MemoryStack/stackPush)]
+    (try
+      (let [props (VkPhysicalDeviceMemoryProperties/malloc stack)]
+        (VK10/vkGetPhysicalDeviceMemoryProperties physical-device props)
+        (loop [i 0]
+          (if (>= i (.memoryTypeCount props))
+            (throw (RuntimeException. "Failed to find suitable memory type"))
+            (let [mem-type (.get (.memoryTypes props) i)
+                  flags    (.propertyFlags mem-type)]
+              (if (and (not= 0 (bit-and (int type-filter) (bit-shift-left 1 i)))
+                       (= (int required-props) (bit-and (int flags) (int required-props))))
+                i
+                (recur (inc i)))))))
+      (finally
+        (MemoryStack/stackPop)))))
+
+(defn- create-vertex-buffer!
+  "Create and populate a host-visible vertex buffer.
+   Returns {:buffer long :memory long :device device}."
+  [^org.lwjgl.vulkan.VkDevice device
+   ^org.lwjgl.vulkan.VkPhysicalDevice physical-device
+   float-data]
+  (let [stack  (MemoryStack/stackPush)
+        floats (count float-data)
+        size   (long (* floats 4))
+        bci    (VkBufferCreateInfo/calloc stack)]
+    (try
+      (.sType bci VK10/VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO)
+      (.size  bci size)
+      (.usage bci VK10/VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+      (.sharingMode bci VK10/VK_SHARING_MODE_EXCLUSIVE)
+      (let [lp (.mallocLong stack 1)
+            r  (VK10/vkCreateBuffer device bci nil lp)]
+        (when (not= r VK10/VK_SUCCESS)
+          (throw (RuntimeException. (str "vkCreateBuffer failed: " r))))
+        (let [buf          (.get lp 0)
+              mr           (VkMemoryRequirements/malloc stack)
+              _            (VK10/vkGetBufferMemoryRequirements device buf mr)
+              host-visible (bit-or VK10/VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                   VK10/VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+              mem-type-idx (find-memory-type physical-device (.memoryTypeBits mr) host-visible)
+              mai          (VkMemoryAllocateInfo/calloc stack)]
+          (.sType           mai VK10/VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
+          (.allocationSize  mai (.size mr))
+          (.memoryTypeIndex mai (int mem-type-idx))
+          (.rewind lp)
+          (let [r2 (VK10/vkAllocateMemory device mai nil lp)]
+            (when (not= r2 VK10/VK_SUCCESS)
+              (VK10/vkDestroyBuffer device buf nil)
+              (throw (RuntimeException. (str "vkAllocateMemory failed: " r2))))
+            (let [mem    (.get lp 0)
+                  _      (VK10/vkBindBufferMemory device buf mem 0)
+                  pp     (.mallocPointer stack 1)
+                  _      (VK10/vkMapMemory device mem 0 size 0 pp)
+                  mapped (.getByteBuffer (.get pp 0) (int size))]
+              (.order mapped ByteOrder/LITTLE_ENDIAN)
+              (let [fb (.asFloatBuffer mapped)]
+                (doseq [f float-data] (.put fb (float f))))
+              (VK10/vkUnmapMemory device mem)
+              {:buffer buf
+               :memory mem
+               :device device}))))
+      (finally
+        (MemoryStack/stackPop))))))
+
+(defn- make-polygon-renderable
+  "Build a :polygon renderable.
+   cfg: {:sides N :color [r g b a] :radius R}
+
+   The renderable maintains an instance pool — a vector of instance maps:
+     {:x float :y float :rotation float :color [r g b a]}
+   Scripts update the pool each tick via the :instances atom in metadata.
+   On draw, all instances are rendered in sequence with push-constants!.
+   If :instances is empty, falls back to drawing one default instance at origin."
+  [cfg _renderer]
+  (let [sides    (int (or (:sides cfg) 6))
+        radius   (double (or (:radius cfg) 0.1))
+        def-color (vec (or (:color cfg) [1.0 1.0 1.0 1.0]))
+        pipeline-atom (atom nil)
+        vbuf-atom     (atom nil)   ; {:buffer :memory :device}
+        instances     (atom [])    ; vector of {:x :y :rotation :color}
+        ;; Reusable ByteBuffer for push constants (allocated once, reused per draw call)
+        pc-buf (doto (ByteBuffer/allocateDirect PUSH_CONSTANT_BYTES)
+                 (.order ByteOrder/LITTLE_ENDIAN))
+        r (reify renderable/Renderable
+            (draw [_this command-buffer _device _render-pass _extent]
+              (let [pl @pipeline-atom
+                    vb @vbuf-atom]
+                (when (and pl vb)
+                  (let [{:keys [pipeline layout]} pl]
+                    (org.lwjgl.vulkan.VK10/vkCmdBindPipeline
+                      ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                      VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
+                      (long pipeline))
+                    ;; Bind vertex buffer at binding 0
+                    (let [stack (org.lwjgl.system.MemoryStack/stackPush)
+                          vbp   (doto (.mallocLong stack 1) (.put (:buffer vb)) (.flip))
+                          offp  (doto (.mallocLong stack 1) (.put 0) (.flip))]
+                      (VK10/vkCmdBindVertexBuffers command-buffer 0 vbp offp)
+                      (org.lwjgl.system.MemoryStack/stackPop))
+                    ;; Draw each instance with per-instance push constants
+                    (let [insts @instances
+                          draw-list (if (seq insts) insts [{:x 0.0 :y 0.0 :rotation 0.0 :color def-color}])]
+                      (doseq [{:keys [x y rotation color]} draw-list]
+                        (let [c (vec (or color def-color))]
+                          (.clear pc-buf)
+                          (.putFloat pc-buf (float (or x 0.0)))        ; translation.x
+                          (.putFloat pc-buf (float (or y 0.0)))        ; translation.y
+                          (.putFloat pc-buf (float (or rotation 0.0))) ; rotation
+                          (.putFloat pc-buf 0.0)                       ; padding
+                          (.putFloat pc-buf (float (nth c 0 1.0)))     ; color.r
+                          (.putFloat pc-buf (float (nth c 1 1.0)))     ; color.g
+                          (.putFloat pc-buf (float (nth c 2 1.0)))     ; color.b
+                          (.putFloat pc-buf (float (nth c 3 1.0)))     ; color.a
+                          (.flip pc-buf)
+                          (pipeline/push-constants!
+                            command-buffer
+                            (long layout)
+                            VK10/VK_SHADER_STAGE_VERTEX_BIT
+                            pc-buf))
+                        (VK10/vkCmdDraw
+                          ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                          (int sides) 1 0 0)))))))
+            (cleanup! [_this device]
+              (when-let [pl @pipeline-atom]
+                (pipeline/destroy! pl)
+                (reset! pipeline-atom nil))
+              (when-let [vb @vbuf-atom]
+                (VK10/vkDestroyBuffer device (long (:buffer vb)) nil)
+                (VK10/vkFreeMemory    device (long (:memory vb)) nil)
+                (reset! vbuf-atom nil))))]
+    (with-meta r {:pipeline-atom pipeline-atom
+                  :vbuf-atom     vbuf-atom
+                  :instances     instances
+                  :sides         sides
+                  :radius        radius})))
+
+;; VK_FORMAT_R32G32_SFLOAT = 103 (two 32-bit floats, for vec2 position)
+(def ^:private ^:const VK_FORMAT_R32G32_SFLOAT 103)
+
+(defn- build-polygon-pipeline!
+  "Initialize GPU resources for a polygon renderable."
+  [renderable renderer]
+  (let [{:keys [pipeline-atom vbuf-atom sides radius]} (meta renderable)
+        ^org.lwjgl.vulkan.VkDevice dev (renderer/get-device renderer)
+        pd  (.getPhysicalDevice dev)
+        rp  (renderer/get-render-pass renderer)
+        ;; Build vertex data
+        floats (compute-polygon-vertices sides radius)
+        vb     (create-vertex-buffer! dev pd floats)
+        ;; Build pipeline with vertex input and push constants
+        pl     (-> (pipeline/builder dev rp)
+                   (pipeline/vert-path "src/shaders/polygon.vert")
+                   (pipeline/frag-path "src/shaders/polygon.frag")
+                   (pipeline/topology  :triangle-fan)
+                   (pipeline/cull-mode :none)
+                   (pipeline/vertex-input 8 [{:location 0
+                                              :format   VK_FORMAT_R32G32_SFLOAT
+                                              :offset   0}])
+                   (pipeline/push-constant-size PUSH_CONSTANT_BYTES)
+                   (pipeline/build!))]
+    (reset! vbuf-atom vb)
+    (reset! pipeline-atom pl)))
+
+(register-renderable! :polygon make-polygon-renderable)
+
+(defn polygon-instances
+  "Return the instances atom for a :polygon renderable so scripts can update it.
+   instances atom holds a vector of {:x :y :rotation :color} maps.
+   Set it via (reset! (edn/polygon-instances r) new-vec) or swap!."
+  [polygon-renderable]
+  (:instances (meta polygon-renderable)))
+
+;; ---------------------------------------------------------------------------
 ;; Component instantiation
 ;; ---------------------------------------------------------------------------
 
@@ -110,9 +324,11 @@
     v))
 
 (defn- post-init-component! [k v renderer]
-  (when (and (= k :renderable)
-             (contains? (meta v) :pipeline-atom))
-    (build-triangle-pipeline! v renderer)))
+  (when (= k :renderable)
+    (let [m (meta v)]
+      (cond
+        (contains? m :vert-path)   (build-triangle-pipeline! v renderer)
+        (contains? m :vbuf-atom)   (build-polygon-pipeline!  v renderer)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Entity loading
