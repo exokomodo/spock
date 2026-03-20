@@ -21,15 +21,17 @@
 (defonce settings (atom defaults))
 
 (defn load!
-  "Load settings from path and merge over defaults. Returns the merged map."
+  "Load settings from path and merge over defaults.
+   Also applies :log-level and :log-file to spock.log. Returns the merged map."
   [path]
-  (if (.exists (io/file path))
-    (let [overrides (-> (slurp (io/file path)) edn/read-string)]
-      (reset! settings (merge defaults overrides))
-      @settings)
-    (do
-      (reset! settings defaults)
-      @settings)))
+  (let [merged (if (.exists (io/file path))
+                 (let [overrides (-> (slurp (io/file path)) edn/read-string)]
+                   (merge defaults overrides))
+                 defaults)]
+    (reset! settings merged)
+    ;; Apply logging config — require lazily to avoid circular dependency
+    ((requiring-resolve 'spock.log/configure!) merged)
+    merged))
 
 (defn merge-scene
   "Merge scene-level overrides (width, height, title) on top of current settings.

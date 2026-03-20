@@ -150,14 +150,14 @@
           (when (realized? error-p)
             (throw @error-p))
           (GLFW/glfwPollEvents)
-          ;; Advance input state: :pressed→:held, :released→:none
-          (input/tick!)
-          ;; Engine-level Escape key closes the window
+          ;; Engine-level Escape key closes the window (check before tick! clears :released)
           (when (input/key-released? :escape)
             (GLFW/glfwSetWindowShouldClose window true))
           (let [now   (System/nanoTime)
                 delta (/ (double (- now last-t)) 1e9)]
             (on-tick! lifecycle delta)
+            ;; Advance input state AFTER on-tick! so scripts see :pressed on the frame it fires
+            (input/tick!)
             (recur now))))
       (on-done! lifecycle)
       (finally

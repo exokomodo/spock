@@ -85,7 +85,7 @@
                       (org.lwjgl.vulkan.VK10/vkCmdDraw
                         ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
                         3 1 0 0))
-                    (log/log "edn :triangle draw: no pipeline yet"))))
+                    (log/trace "edn :triangle draw: no pipeline yet"))))
               (cleanup! [_this _device]
                 (pipeline/destroy! @pipeline-atom)
                 (reset! pipeline-atom {})))]
@@ -407,7 +407,7 @@
         base-dir (.getParent (io/file scene-path))
         script   (load-script (:script cfg))
         ent-cfgs (vec (:entities cfg []))]
-    (log/log "load-scene-data:" scene-path "entities=" (count ent-cfgs))
+    (log/info "load-scene-data:" scene-path "entities=" (count ent-cfgs))
     {:scene-id  scene-id
      :scene-path scene-path
      :script    script
@@ -464,7 +464,7 @@
   (let [current-scene (atom nil)]
     (reify game/GameLifecycle
       (on-init! [_this]
-        (log/log "edn on-init!")
+        (log/info "edn on-init!")
         (let [r   (:renderer g)
               sc  (init-scene! initial-scene-data r)]
           (reset! current-scene sc)
@@ -527,7 +527,7 @@
                                      (:width  merged 1280)
                                      (:height merged 720))
         scene-data   (load-scene-data entry-name entry-path nil)]
-    (log/log "load-game:" game-path "entry=" entry-name "scenes=" (count registry))
+    (log/info "load-game:" game-path "entry=" entry-name "scenes=" (count registry))
     [g (make-lifecycle g scene-data shared-state registry)]))
 
 ;; ---------------------------------------------------------------------------
@@ -545,5 +545,5 @@
                                (:height merged 720))
         shared (atom {})
         data   (load-scene-data (keyword scene-path) scene-path nil)]
-    (log/log "load-bare-scene:" scene-path)
+    (log/info "load-bare-scene:" scene-path)
     [g (make-lifecycle g data shared {})]))

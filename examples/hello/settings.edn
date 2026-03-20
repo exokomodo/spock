@@ -1,2 +1,6 @@
 {:width  1280
- :height 720}
+ :height 720
+
+ ;; Log level: :error :warn :info :debug :trace
+ ;; Default is :info — set :trace for full engine verbosity during development
+ :log-level :warn}
