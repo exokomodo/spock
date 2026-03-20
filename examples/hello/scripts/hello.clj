@@ -9,7 +9,7 @@
                              :elapsed 0.0}))
 
 (defn on-init [game scene shared-state]
-  (log/info "hello.scripts.hello/on-init entities=" (count (spock.scene/get-entities scene))))
+  (log/info "hello.scripts.hello/on-init"))
 
 (defn on-tick [game scene delta shared-state]
   (let [r      (:renderer game)

@@ -45,21 +45,10 @@
 (defn- post-init-component! [k v renderer]
   (when (= k :renderable)
     (let [m (meta v)]
-      (log/info "post-init-component! meta keys=" (keys m))
       (cond
-        (contains? m :vert-path)
-        (do (log/info "building triangle pipeline")
-            (spock.renderable.triangle/build-pipeline! v renderer)
-            (log/info "triangle pipeline built"))
-        (contains? m :image-path)
-        (do (log/info "building sprite pipeline image=" (:image-path m))
-            (spock.renderable.sprite/build-pipeline! v renderer)
-            (log/info "sprite pipeline built"))
-        (contains? m :vbuf-atom)
-        (do (log/info "building polygon pipeline sides=" (:sides m))
-            (spock.renderable.polygon/build-pipeline! v renderer)
-            (log/info "polygon pipeline built"))
-        :else (log/warn "post-init-component!: no matching meta key for renderable")))))
+        (contains? m :vert-path)  (spock.renderable.triangle/build-pipeline! v renderer)
+        (contains? m :image-path) (spock.renderable.sprite/build-pipeline!   v renderer)
+        (contains? m :vbuf-atom)  (spock.renderable.polygon/build-pipeline!  v renderer)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Entity loading
