@@ -36,7 +36,13 @@
            :source-paths ["src" "examples"]
            ;; macOS requires GLFW on the first thread of the process.
            ;; Linux doesn't need this but it's harmless.
-           :jvm-opts ["-XstartOnFirstThread"]}}
+           ;; LWJGL library path is set via JVM_OPTS in the Makefile on macOS;
+           ;; the property below is a no-op on Linux.
+           :jvm-opts ["-XstartOnFirstThread"
+                      ~(str "-Dorg.lwjgl.librarypath="
+                            (or (System/getenv "VULKAN_LIB_DIR") "/usr/local/lib"))]}}
+
+
 
   :aliases
   {"hello" ["with-profile" "hello" "run"]})
