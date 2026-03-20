@@ -202,7 +202,7 @@
               (VK10/vkUnmapMemory device mem)
               {:buffer buf
                :memory mem
-               :device device}))))
+               :device device})))
       (finally
         (MemoryStack/stackPop))))))
 
