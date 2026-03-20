@@ -18,7 +18,8 @@
   (:require [spock.renderer.core :as renderer]
             [spock.renderer.vulkan :as vk]
             [spock.entity :as entity]
-            [spock.input.core :as input])
+            [spock.input.core :as input]
+            [spock.audio.core :as audio])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -138,6 +139,7 @@
                   "spock-render")]
     (try
       (renderer/create-surface! r window)
+      (audio/init!)
       (.start render-t)
       (let [ready-val @ready-p]
         (when (instance? Exception ready-val)
@@ -158,9 +160,11 @@
             (on-tick! lifecycle delta)
             ;; Advance input state AFTER on-tick! so scripts see :pressed on the frame it fires
             (input/tick!)
+            (audio/tick!)
             (recur now))))
       (on-done! lifecycle)
       (finally
         (vreset! stop? true)
         (.join render-t 5000)
+        (audio/cleanup!)
         (destroy-window! game)))))
