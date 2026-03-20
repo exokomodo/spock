@@ -1,5 +1,19 @@
 {
     "cSpell.words": [
         "lein"
-    ]
+    ],
+    "[clojure]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.autoClosingBrackets": "always",
+        "editor.autoClosingOvertype": "always",
+        "editor.autoClosingQuotes": "always",
+        "editor.autoIndent": "advanced",
+        "editor.defaultFormatter": "betterthantomorrow.calva",
+        "editor.formatOnPaste": true,
+        "editor.formatOnType": true,
+        "editor.matchBrackets": "near",
+        "editor.wordSeparators": "\t ()\"':,;~@#$%^&{}[]`",
+        "files.trimFinalNewlines": true,
+        "files.trimTrailingWhitespace": true,
+    }
 }

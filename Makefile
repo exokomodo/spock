@@ -64,10 +64,24 @@ endif
 build: ## Build the project
 	lein compile
 
+.PHONY: build/shaders
+build/shaders: shaders/polygon ## Build engine shaders
+
+.PHONY: shaders/polygon
+shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
+	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
+	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+
 .PHONY: check
-check: ## Compile all profiles (syntax check, no run)
+check: check/format check/compile ## Check code quality
+
+.PHONY: check/compile
+check/compile: ## Check code quality
 	lein with-profile edn compile
 	lein with-profile spin-shooter compile
+
+.PHONY: check/format
+check/format: ## Check code formatting with cljfmt
 
 .PHONY: clean
 clean: ## Clean the project
@@ -77,23 +91,12 @@ clean: ## Clean the project
 deps: ## Install project dependencies
 	lein deps
 
-.PHONY: test
-test: ## Run tests
-	lein test
+.PHONY: fix
+fix: fix/format ## Fix code issues
 
-##@ Examples
-.PHONY: run/hello
-run/hello: shaders/hello
-	$(DISPLAY_PREFIX) lein hello
-
-# EDN-driven game runner. Usage: make run/edn EDN=examples/hello/game.edn
-EDN ?= examples/hello/game.edn
-.PHONY: run/edn
-run/edn: shaders/hello
-	$(DISPLAY_PREFIX) lein edn $(EDN)
-
-.PHONY: edn
-edn: run/edn ## Run a game from an EDN file (EDN=path/to/game.edn)
+.PHONY: fix/format
+fix/format: ## Fix code formatting
+	lein cljfmt fix
 
 # screenrecord — capture the cage window to a file.
 # Requires cage and wf-recorder (wlroots-based screen capture for cage's Wayland compositor).
@@ -101,41 +104,49 @@ edn: run/edn ## Run a game from an EDN file (EDN=path/to/game.edn)
 # Usage: make screenrecord [OUTPUT=my-recording.mp4] [GEOMETRY=0,0 1920x1080]
 OUTPUT   ?= recording.mp4
 GEOMETRY ?= 0,0 1920x1080
+RECORD_EXAMPLE ?= hello
+
 .PHONY: screenrecord
 screenrecord: shaders/hello ## Record the hello window via cage + wf-recorder (OUTPUT=recording.mp4)
 	$(if $(shell which cage 2>/dev/null),,$(error cage is required for screenrecord but was not found))
 	$(if $(shell which wf-recorder 2>/dev/null),,$(error wf-recorder is required for screenrecord but was not found))
-	@echo "Recording to $(OUTPUT)…"
-	LIBSEAT_BACKEND=seatd \
-	WLR_NO_HARDWARE_CURSORS=1 \
-	WLR_DRM_DEVICES=/dev/dri/card1 \
+	echo "Recording to $(OUTPUT)…"
+	LIBSEAT_BACKEND=seatds
+	WLR_NO_HARDWARE_CURSORS=1s
+	WLR_DRM_DEVICES=/dev/dri/card1s
 	cage -- sh -c '\
 		wf-recorder --codec libx264 -g "$(GEOMETRY)" -f "$(OUTPUT)" & WF_PID=$$!; \
 		sleep 2; \
-		lein hello; \
+		lein $(RECORD_EXAMPLE); \
 		kill -INT $$WF_PID; \
 		wait $$WF_PID 2>/dev/null || true'
+
+.PHONY: test
+test: ## Run tests
+	lein test
+
+##@ Examples
+
+EDN ?= examples/hello/game.edn
+.PHONY: run/edn
+run/edn: shaders/hello ## EDN-driven game runner. Usage: make run/edn EDN=examples/hello/game.edn
+	$(DISPLAY_PREFIX) lein edn $(EDN)
+
+.PHONY: run/hello
+run/hello: shaders/hello ## Run the hello example
+	$(DISPLAY_PREFIX) lein hello
 
 .PHONY: shaders/hello
 shaders/hello:
 	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
 	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
 
-.PHONY: shaders/polygon
-shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
-	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
-	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
-
 .PHONY: run/spin-shooter
 run/spin-shooter: shaders/polygon ## Run the spin-shooter example
 	$(DISPLAY_PREFIX) lein spin-shooter
 
-
-.PHONY: spin-shooter
-spin-shooter: run/spin-shooter ## Run the spin-shooter example (alias)
-
-.PHONY: hello
-hello: run/hello ## Run the hello example
+.PHONY: edn
+edn: run/edn ## Run a game from an EDN file (EDN=path/to/game.edn)
 
 ##@ Utilities
 
