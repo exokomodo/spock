@@ -2,6 +2,7 @@
   "Hello Vulkan — triangle with animated clear color.
    Mirrors exokomodo/drakon examples/hello/main.cpp"
   (:require [spock.game.core      :as game]
+            [spock.entity         :as entity]
             [spock.renderable.core :as renderable]
             [spock.renderer.core   :as renderer]
             [spock.pipeline.core   :as pipeline]
@@ -81,7 +82,7 @@
     (let [shader-dir (str (System/getProperty "user.dir")
                           "/examples/hello/shaders/")]
       (build-pipeline! triangle (:renderer g) shader-dir)
-      (game/add-renderable! g triangle))
+      (game/add-entity! g (entity/make :triangle {:renderable triangle})))
     (log/log "on-init! done"))
 
   (on-tick! [_this delta]
