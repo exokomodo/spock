@@ -79,7 +79,7 @@
      r#))
 
 (defn- utf8 [^MemoryStack stack ^String s]
-  (.UTF8 stack s false))
+  (.UTF8 stack s true))
 
 (defn- strings->pp
   "Allocate a PointerBuffer on stack populated with null-terminated UTF-8 strings."

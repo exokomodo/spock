@@ -175,12 +175,12 @@
                        (doto (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
                              (.stage VK10/VK_SHADER_STAGE_VERTEX_BIT)
                              (.module vert-mod)
-                             (.pName (.UTF8 stack "main" false))))
+                             (.pName (.UTF8 stack "main" true))))
                    (-> (.get 1)
                        (doto (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO)
                              (.stage VK10/VK_SHADER_STAGE_FRAGMENT_BIT)
                              (.module frag-mod)
-                             (.pName (.UTF8 stack "main" false)))))
+                             (.pName (.UTF8 stack "main" true)))))
 
           ;; Vertex input — no vertex buffers by default
           vertex-input-ci (doto (VkPipelineVertexInputStateCreateInfo/calloc stack)
