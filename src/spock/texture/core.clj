@@ -100,8 +100,12 @@
             si  (doto (VkSubmitInfo/calloc stack)
                   (.sType VK10/VK_STRUCTURE_TYPE_SUBMIT_INFO)
                   (.pCommandBuffers cbp))]
-        (VK10/vkQueueSubmit graphics-queue si VK10/VK_NULL_HANDLE)
-        (VK10/vkQueueWaitIdle graphics-queue))
+        (println "[texture] submitting to queue...")
+        (let [r2 (VK10/vkQueueSubmit graphics-queue si VK10/VK_NULL_HANDLE)]
+          (println "[texture] submit result=" r2)
+          (println "[texture] waiting idle...")
+          (VK10/vkQueueWaitIdle graphics-queue)
+          (println "[texture] wait done")))
       (finally
         (MemoryStack/stackPop))))
   (let [stack (MemoryStack/stackPush)]
