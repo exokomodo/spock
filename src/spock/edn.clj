@@ -30,6 +30,7 @@
             [spock.renderable.triangle]
             [spock.renderable.polygon]
             [spock.renderer.core   :as renderer]
+            [spock.audio.core      :as audio]
             [spock.log             :as log]))
 
 ;; ---------------------------------------------------------------------------
@@ -39,6 +40,7 @@
 (defn- instantiate-component [k v renderer]
   (case k
     :renderable (registry/make-renderable v renderer)
+    :audio      (audio/load-sound! (:file v))
     v))
 
 (defn- post-init-component! [k v renderer]
