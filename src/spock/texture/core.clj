@@ -327,7 +327,10 @@
             pixels    (int-array (* width height))
             _         (.getRGB rgba-img 0 0 width height pixels 0 width)
             _         (println "[texture] D - got" (alength pixels) "pixels, allocating" img-size "bytes")
-            pixel-buf (MemoryUtil/memAlloc (int img-size))
+            pixel-buf (do (println "[texture] D2 - calling memAlloc")
+                          (let [b (MemoryUtil/memAlloc (int img-size))]
+                            (println "[texture] D3 - memAlloc done")
+                            b))
             _         (let [n (alength pixels)]
                         (loop [i 0]
                           (when (< i n)
