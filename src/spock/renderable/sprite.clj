@@ -54,10 +54,10 @@
   (let [hw (/ (float w) 2.0)
         hh (/ (float h) 2.0)]
     (float-array
-     [-hw -hh  0.0 0.0
-      hw -hh  1.0 0.0
-      hw  hh  1.0 1.0
-      -hw  hh  0.0 1.0])))
+     [(- hw) (- hh) 0.0 0.0
+      hw     (- hh) 1.0 0.0
+      hw     hh     1.0 1.0
+      (- hw) hh     0.0 1.0])))
 
 (defn- make-indices []
   (short-array [0 1 2  2 3 0]))
