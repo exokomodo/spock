@@ -7,7 +7,7 @@
    Screen edge for spawn / despawn: abs(x) > 1.2 or abs(y) > 1.2."
   (:require [spock.scene  :as scene]
             [spock.entity :as entity]
-            [spock.edn    :as edn]
+            [spock.renderable.polygon :as polygon]
             [spock.input.core :as input]
             [spock.renderer.core :as renderer]
             [spock.log    :as log]))
@@ -250,14 +250,14 @@
 
       ;; Planet
       (when-let [r (find-r :planet-r)]
-        (when-let [inst (edn/polygon-instances r)]
+        (when-let [inst (polygon/instances r)]
           (reset! inst [{:x 0.0 :y 0.0
                          :rotation (get-in s [:planet :angle])
                          :color [0.3 0.7 1.0 1.0]}])))
 
       ;; Guns
       (when-let [r (find-r :gun-r)]
-        (when-let [inst (edn/polygon-instances r)]
+        (when-let [inst (polygon/instances r)]
           (reset! inst
                   (mapv (fn [{:keys [angle]}]
                           (let [[gx gy] (gun-pos angle)]
@@ -268,7 +268,7 @@
 
       ;; Bullets
       (when-let [r (find-r :bullet-r)]
-        (when-let [inst (edn/polygon-instances r)]
+        (when-let [inst (polygon/instances r)]
           (reset! inst
                   (mapv (fn [b]
                           {:x (:x b) :y (:y b)
@@ -278,7 +278,7 @@
 
       ;; Enemies
       (when-let [r (find-r :enemy-r)]
-        (when-let [inst (edn/polygon-instances r)]
+        (when-let [inst (polygon/instances r)]
           (reset! inst
                   (mapv (fn [e]
                           {:x (:x e) :y (:y e)

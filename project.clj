@@ -52,7 +52,6 @@
                                               "/usr/local/lib/libvulkan.1.dylib"))))}}
 
   :aliases
-  {"hello"        ["with-profile" "edn" "run" "--" "examples/hello/game.edn"]
-   "edn"          ["with-profile" "edn" "run" "--"]
+  {"hello"        ["with-profile" "hello" "run" "--" "examples/hello/game.edn"]
    "spin-shooter" ["with-profile" "spin-shooter" "run" "--"
                    "examples/spin_shooter/game.edn"]})
