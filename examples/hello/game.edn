@@ -1,0 +1,10 @@
+{:title  "Hello Vulkan"
+ :width  1280
+ :height 720
+
+ ;; Script namespace — contains on-init, on-tick, on-done
+ :script hello.script
+
+ :renderables [{:type    :triangle
+                :shaders {:vert "examples/hello/shaders/triangle.vert"
+                          :frag "examples/hello/shaders/triangle.frag"}}]}

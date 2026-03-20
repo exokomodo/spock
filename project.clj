@@ -31,7 +31,16 @@
   :resource-paths ["resources"]
 
   :profiles
-  {:hello {:main hello.core
+  {:edn   {:main spock.main
+           :aot [spock.main]
+           :source-paths ["src" "examples"]
+           :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
+                        (= "Mac OS X" (System/getProperty "os.name"))
+                        (conj "-XstartOnFirstThread"
+                              (str "-Dorg.lwjgl.vulkan.libname="
+                                   (or (System/getenv "VULKAN_LOADER")
+                                       "/usr/local/lib/libvulkan.1.dylib"))))}
+   :hello {:main hello.core
            :aot [hello.core]
            :source-paths ["src" "examples"]
            ;; macOS requires GLFW on the first thread of the process.
@@ -48,4 +57,6 @@
 
 
   :aliases
-  {"hello" ["with-profile" "hello" "run"]})
+  {"hello"  ["with-profile" "hello" "run"]
+   "record" ["with-profile" "hello" "run" "--" "--record"]
+   "edn"    ["with-profile" "edn"   "run" "--"]})
