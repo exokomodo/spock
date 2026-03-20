@@ -4,8 +4,9 @@
    (spock/load-game \"game.edn\")   → [game lifecycle]  ; full game with registry
    (spock/load-game \"scene.edn\")  → [game lifecycle]  ; bare scene, backward compat
    (game/start! game lifecycle)"
-  (:require [spock.edn :as edn-loader]
-            [clojure.string :as str]))
+  (:require [spock.edn                :as edn-loader]
+            [spock.renderable.registry :as registry]
+            [clojure.string            :as str]))
 
 (defn load-game
   "Load a game or scene EDN file. Returns [game lifecycle].
@@ -22,5 +23,5 @@
      :scene (edn-loader/load-bare-scene path)
      (throw (ex-info (str "Unknown format: " fmt) {:format fmt})))))
 
-;; Re-export renderable registry
-(def register-renderable! edn-loader/register-renderable!)
+;; Re-export renderable registry — games should require spock.core, not the registry directly
+(def register-renderable! registry/register-renderable!)
