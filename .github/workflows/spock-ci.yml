@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Leiningen
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein \
+            -o /usr/local/bin/lein
+          chmod +x /usr/local/bin/lein
+          lein version
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Run tests
+        run: make test
+
+  headless-run:
+    name: Headless render (hello example)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Leiningen
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein \
+            -o /usr/local/bin/lein
+          chmod +x /usr/local/bin/lein
+          lein version
+
+      - name: Install Vulkan (lavapipe) and display dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            glslang-tools \
+            libvulkan1 \
+            vulkan-tools \
+            mesa-vulkan-drivers \
+            xvfb \
+            libgl1 \
+            libglu1-mesa
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Compile hello shaders
+        run: make shaders/hello
+
+      - name: Run hello example headlessly (auto-closes after 5 s)
+        env:
+          DISPLAY: ":99"
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          # Force Mesa software renderer — no GPU needed
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          Xvfb :99 -screen 0 1280x720x24 &
+          XVFB_PID=$!
+          sleep 1
+          # hello auto-closes after 5 seconds (see hello/scripts/hello.clj)
+          timeout 30 lein with-profile edn run -- examples/hello/game.edn
+          EXIT=$?
+          kill $XVFB_PID 2>/dev/null || true
+          exit $EXIT

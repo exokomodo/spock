@@ -58,6 +58,11 @@ setup/lein:
 build: ## Build the project
 	lein compile
 
+.PHONY: check
+check: ## Compile all profiles (syntax check, no run)
+	lein with-profile edn compile
+	lein with-profile spin-shooter compile
+
 .PHONY: clean
 clean: ## Clean the project
 	lein clean
