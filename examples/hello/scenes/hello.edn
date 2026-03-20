@@ -4,4 +4,11 @@
  :entities [{:id         :triangle
              :renderable {:type    :triangle
                           :shaders {:vert "examples/hello/shaders/triangle.vert"
-                                    :frag "examples/hello/shaders/triangle.frag"}}}]}
+                                    :frag "examples/hello/shaders/triangle.frag"}}}
+
+            {:id         :test-sprite
+             :renderable {:type   :sprite
+                          :image  "examples/hello/assets/images/test.png"
+                          :width  0.4
+                          :height 0.4
+                          :color  [1.0 1.0 1.0 1.0]}}]}
