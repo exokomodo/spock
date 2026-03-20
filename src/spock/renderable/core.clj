@@ -8,4 +8,8 @@
      command-buffer — VkCommandBuffer (long handle)
      device         — VkDevice (long handle)
      render-pass    — VkRenderPass (long handle)
-     extent         — VkExtent2D"))
+     extent         — VkExtent2D")
+  (cleanup! [this device]
+    "Release any GPU resources owned by this renderable.
+     Called by the renderer during shutdown, before vkDestroyDevice.
+     device — VkDevice"))

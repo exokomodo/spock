@@ -109,8 +109,8 @@
         (when-not @stop?
           (renderer/render! r (:renderables @(:state game)))
           (recur)))
-      ;; Drain GPU before cleanup
-      (renderer/cleanup! r)
+      ;; Drain GPU and clean up renderables before device destruction
+      (renderer/cleanup! r (:renderables @(:state game)))
       (catch Exception e
         ;; Deliver to whichever promise hasn't been delivered yet
         (if (realized? ready-p)
