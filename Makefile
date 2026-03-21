@@ -86,48 +86,48 @@ build/all: build/engine ## Compile everything (including examples)
 	$(LEIN) with-profile spin-shooter compile
 
 .PHONY: build/engine
-build/engine: build/shaders/engine ## Build the engine alone
+build/engine: ## Build the engine alone
 	$(LEIN) compile
 
-.PHONY: build/shaders
-build/shaders: build/shaders/engine build/shaders/examples ## Build all shaders
-
-.PHONY: build/shaders/engine
-build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite build/shaders/engine/text ## Build engine shaders
-
-.PHONY: build/shaders/engine/polygon
-build/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
-
-.PHONY: build/shaders/engine/sprite
-build/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite renderable)
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
-
-.PHONY: build/shaders/engine/text
-build/shaders/engine/text: ## Compile the text shaders (used by :text renderable)
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.vert -o src/shaders/text.vert.spv
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.frag -o src/shaders/text.frag.spv
-
-.PHONY: build/shaders/examples
-build/shaders/examples: build/shaders/examples/hello ## Build example shaders
-
-.PHONY: build/shaders/examples/hello
-build/shaders/examples/hello: ## Compile the hello example shaders
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
-	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
-
 .PHONY: check
-check: check/format ## Check code quality
+check: check/format check/shaders ## Check code quality
 
 .PHONY: check/format
 check/format: ## Check code formatting with cljfmt
 	$(LEIN) cljfmt check
+
+.PHONY: check/shaders
+check/shaders: check/shaders/engine check/shaders/examples ## Check shader compilation
+
+.PHONY: check/shaders/engine
+check/shaders/engine: check/shaders/engine/polygon check/shaders/engine/sprite check/shaders/engine/text ## Build engine shaders
+
+.PHONY: check/shaders/engine/polygon
+check/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.vert
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.frag
+
+.PHONY: check/shaders/engine/sprite
+check/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag
+
+.PHONY: check/shaders/engine/text
+check/shaders/engine/text: ## Compile the text shaders (used by :text renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.vert
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.frag
+
+.PHONY: check/shaders/examples
+check/shaders/examples: check/shaders/examples/hello ## Build example shaders
+
+.PHONY: check/shaders/examples/hello
+check/shaders/examples/hello: ## Compile the hello example shaders
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.vert
+	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.frag
 
 .PHONY: clean
 clean: clean/clojure clean/shaders ## Clean the project
@@ -181,11 +181,11 @@ test: ## Run tests
 ##@ Examples
 
 .PHONY: run/hello
-run/hello: build/shaders ## Run the hello example
+run/hello: ## Run the hello example
 	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) hello
 
 .PHONY: run/spin-shooter
-run/spin-shooter: build/shaders ## Run the spin-shooter example
+run/spin-shooter: ## Run the spin-shooter example
 	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) spin-shooter
 
 ##@ Utilities
