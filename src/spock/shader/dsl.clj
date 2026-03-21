@@ -103,49 +103,73 @@
     ;; list forms
     (seq? form)
     (let [[op & args] form]
-      (case op
-        ;; field access: (.x v) → v.x
-        (.x .y .z .w .r .g .b .a .xy .xyz .xyzw .zw .yz .translation .rotation .color
-            .scale .pos .size .uv-pos .uv-size .padding .padding2)
-        (str (emit-expr (first args)) "." (subs (name op) 1))
+      (cond
+        ;; field access: any (.foo expr) → expr.foo  (handles .x .translation .rgb etc.)
+        (and (symbol? op) (.startsWith (name op) "."))
+        (let [field (subs (name op) 1)
+              ;; kebab-case field → camelCase (e.g. .uv-pos → uvPos)
+              parts (clojure.string/split field #"-")
+              glsl-field (str (first parts)
+                              (apply str (map clojure.string/capitalize (rest parts))))]
+          (str (emit-expr (first args)) "." glsl-field))
+
         ;; array index: (aget arr i) → arr[i]
-        aget
+        (= op 'aget)
         (str (emit-expr (first args)) "[" (emit-expr (second args)) "]")
+
         ;; binary operators
-        (+ - * /)
+        ('#{+ - * /} op)
         (str "(" (emit-expr (first args)) " " (name op) " " (emit-expr (second args)) ")")
+
+        ;; compound assignment: (*= var val) → var *= val
+        (contains? #{"+=", "-=", "*="} (name op))
+        (str (emit-expr (first args)) " " (name op) " " (emit-expr (second args)))
+
         ;; comparison / logical
-        (= not= < > <= >= and or not)
+        ('#{= not= < > <= >= and or not} op)
         (let [glsl-op (case op = "==" not= "!=" < "<" > ">" <= "<=" >= ">="
                             and "&&" or "||" not "!")]
           (if (= op 'not)
             (str "(!" (emit-expr (first args)) ")")
             (str "(" (emit-expr (first args)) " " glsl-op " " (emit-expr (second args)) ")")))
+
         ;; set! (assignment)
-        set!
+        (= op 'set!)
         (str (emit-expr (first args)) " = " (emit-expr (second args)))
-        ;; let bindings → local declarations
-        let
+
+        ;; let bindings — require ^TypeHint metadata on each bound symbol
+        ;; e.g. (let [^float c (cos x)  ^vec2 pos (vec2 0.0 0.0)] body...)
+        (= op 'let)
         (let [[bindings & body] args
               pairs (partition 2 bindings)
-              decls (map (fn [[name val]]
-                           (str "  // let " (emit-expr name) "\n"
-                                "  auto " (emit-expr name) " = " (emit-expr val) ";"))
+              decls (map (fn [[n val]]
+                           (let [t (-> n meta :tag)]
+                             (when-not t
+                               (throw (ex-info
+                                       (str "let binding '" n "' requires a type hint, e.g. ^float " n)
+                                       {:sym n})))
+                             (str (glsl-type (keyword (name t))) " " (emit-expr n)
+                                  " = " (emit-expr val) ";")))
                          pairs)
-              stmts (map #(str "  " (emit-expr %) ";") body)]
-          (clojure.string/join "\n" (concat decls stmts)))
+              stmts (map #(str (emit-expr %) ";") body)]
+          (clojure.string/join "\n    " (concat decls stmts)))
+
         ;; when / if
-        when
-        (str "if (" (emit-expr (first args)) ") {\n"
-             (clojure.string/join "\n" (map #(str "    " (emit-expr %) ";") (rest args)))
+        (= op 'when)
+        (str "if (" (emit-expr (first args)) ") {\n    "
+             (clojure.string/join "\n    " (map #(str (emit-expr %) ";") (rest args)))
              "\n  }")
-        if
+
+        (= op 'if)
         (str "(" (emit-expr (first args)) " ? "
              (emit-expr (second args)) " : " (emit-expr (nth args 2)) ")")
-        ;; do / begin
-        do
-        (clojure.string/join "\n  " (map #(str (emit-expr %) ";") args))
-        ;; function calls: (vec4 x y z w), (cos x), (dot a b), etc.
+
+        ;; do / begin — multiple statements
+        (= op 'do)
+        (clojure.string/join "\n    " (map #(str (emit-expr %) ";") args))
+
+        ;; everything else: function call
+        :else
         (str (name op) "(" (emit-args args) ")")))
     :else (str form)))
 
