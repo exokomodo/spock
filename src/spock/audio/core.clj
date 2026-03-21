@@ -39,11 +39,11 @@
 (defn init!
   "Open the default OpenAL device, create a context, and make it current."
   []
-  (let [dev (ALC10/alcOpenDevice ^String nil)]
+  (let [dev (ALC10/nalcOpenDevice 0)]
     (when (= dev MemoryUtil/NULL)
       (throw (RuntimeException. "OpenAL: failed to open default device")))
     (let [alc-caps (ALC/createCapabilities dev)
-          ctx      (ALC10/alcCreateContext dev ^java.nio.IntBuffer nil)]
+          ctx      (ALC10/alcCreateContext dev (identity nil))]
       (when (= ctx MemoryUtil/NULL)
         (ALC10/alcCloseDevice dev)
         (throw (RuntimeException. "OpenAL: failed to create context")))
