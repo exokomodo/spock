@@ -41,10 +41,29 @@ ifeq ($(OS),Darwin)
   export JVM_OPTS := -Dorg.lwjgl.vulkan.libname=$(VULKAN_LOADER) $(JVM_OPTS)
 endif
 
+GLSLC = $(shell which glslc)
+ifeq ($(GLSLC),)
+  $(warning "glslc shader compiler not found in PATH. Please install it (e.g. via 'make setup/glslc') and ensure it's available in your PATH.")
+endif
+GLSLC_ARGS := -Werror
+
+LEIN = $(shell which lein)
+ifeq ($(LEIN),)
+  $(warning "Leiningen not found in PATH. Please install it (e.g. via 'make setup/lein') and ensure it's available in your PATH.")
+endif
+
 ##@ Setup environment
 
 .PHONY: setup
-setup: setup/lein setup/hooks ## Setup the development environment
+setup: setup/glslc setup/lein setup/hooks ## Setup the development environment
+
+.PHONY: setup/glslc
+setup/glslc: ## Install glslc shader compiler (macOS: brew; Linux: apt)
+ifeq ($(OS),Darwin)
+	brew install glslang
+else
+	sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends glslc
+endif
 
 .PHONY: setup/hooks
 setup/hooks: ## Install git hooks
@@ -56,58 +75,67 @@ setup/lein:
 	curl -fL https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein > $(BIN_DIR)/lein
 	chmod +x $(BIN_DIR)/lein
 
-.PHONY: setup/glslc
-setup/glslc: ## Install glslc shader compiler (macOS: brew; Linux: apt)
-ifeq ($(OS),Darwin)
-	brew install glslang
-else
-	sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends glslc
-endif
-
 ##@ Development tools
 .PHONY: build
-build: build/shaders ## Build the project
-	lein compile
+build: build/engine ## Build the engine
 
 .PHONY: build/all
-build/all: build/shaders ## Compile examples
-	lein with-profile hello compile
-	lein with-profile spin-shooter compile
+build/all: build/engine ## Compile everything (including examples)
+	$(LEIN) with-profile hello compile
+	$(LEIN) with-profile spin-shooter compile
+
+.PHONY: build/engine
+build/engine: build/shaders/engine ## Build the engine alone
+	$(LEIN) compile
 
 .PHONY: build/shaders
-build/shaders: build/shaders/polygon build/shaders/hello ## Build engine shaders
+build/shaders: build/shaders/engine build/shaders/examples ## Build all shaders
 
-.PHONY: build/shaders/hello
-build/shaders/hello:
-	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
-	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
+.PHONY: build/shaders/engine
+build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite ## Build engine shaders
 
-.PHONY: build/shaders/polygon
-build/shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
-	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
-	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+.PHONY: build/shaders/engine/polygon
+build/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+
+.PHONY: build/shaders/engine/sprite
+build/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+
+.PHONY: build/shaders/examples
+build/shaders/examples: build/shaders/examples/hello ## Build example shaders
+
+.PHONY: build/shaders/examples/hello
+build/shaders/examples/hello: ## Compile the hello example shaders
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
 
 .PHONY: check
 check: check/format ## Check code quality
 
 .PHONY: check/format
 check/format: ## Check code formatting with cljfmt
-	lein cljfmt check
+	$(LEIN) cljfmt check
 
 .PHONY: clean
 clean: ## Clean the project
-	lein clean
+	$(LEIN) clean
 
 .PHONY: deps
 deps: ## Install project dependencies
-	lein deps
+	$(LEIN) deps
 
 .PHONY: fix
 fix: fix/format ## Fix code issues
 
 .PHONY: fix/format
 fix/format: ## Fix code formatting
-	lein cljfmt fix
+	$(LEIN) cljfmt fix
 
 # screenrecord — capture the cage window to a file.
 # Requires cage and wf-recorder (wlroots-based screen capture for cage's Wayland compositor).
@@ -128,23 +156,23 @@ screenrecord: shaders/hello ## Record the hello window via cage + wf-recorder (O
 	cage -- sh -c '\
 		wf-recorder --codec libx264 -g "$(GEOMETRY)" -f "$(OUTPUT)" & WF_PID=$$!; \
 		sleep 2; \
-		lein $(RECORD_EXAMPLE); \
+		$(LEIN) $(RECORD_EXAMPLE); \
 		kill -INT $$WF_PID; \
 		wait $$WF_PID 2>/dev/null || true'
 
 .PHONY: test
 test: ## Run tests
-	lein test
+	$(LEIN) test
 
 ##@ Examples
 
 .PHONY: run/hello
 run/hello: build/shaders ## Run the hello example
-	$(DISPLAY_PREFIX) lein hello
+	$(DISPLAY_PREFIX) $(LEIN) hello
 
 .PHONY: run/spin-shooter
 run/spin-shooter: build/shaders ## Run the spin-shooter example
-	$(DISPLAY_PREFIX) lein spin-shooter
+	$(DISPLAY_PREFIX) $(LEIN) spin-shooter
 
 ##@ Utilities
 
