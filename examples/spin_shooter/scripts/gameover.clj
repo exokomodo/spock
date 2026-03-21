@@ -20,7 +20,7 @@
   (log/info "gameover: score=" (:score @shared-state))
   (reset! elapsed 0.0)
   (renderer/set-clear-color! (:renderer game) [0.55 0.05 0.05 1.0])
-  (let [base-dir "examples/spin_shooter/audio"
+  (let [base-dir "examples/spin_shooter/assets/audio"
         gameover-id (try (audio/load-sound! (str base-dir "/gameover.wav"))
                          (catch Exception e
                            (log/warn "audio: could not load gameover.wav:" (.getMessage e))

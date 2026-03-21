@@ -4,4 +4,9 @@
  ;; 0 = stay open indefinitely (useful for real deployments).
  :auto-close-secs 5
 
- :entities []}
+ :entities [{:id         :gameover
+             :renderable {:type   :sprite
+                          :image  "examples/spin_shooter/assets/images/gameover.png"
+                          :color  [1.0 1.0 1.0 1.0]
+                          :width  0.4
+                          :height 0.4}}]}

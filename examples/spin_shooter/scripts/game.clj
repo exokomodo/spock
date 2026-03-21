@@ -94,7 +94,7 @@
 (defn on-init [game sc shared-state]
   (log/log "spin-shooter game on-init")
   ;; Load sound assets
-  (let [base-dir "examples/spin_shooter/audio"
+  (let [base-dir "examples/spin_shooter/assets/audio"
         shoot-id (try (audio/load-sound! (str base-dir "/shoot.wav"))
                       (catch Exception e
                         (log/warn "audio: could not load shoot.wav:" (.getMessage e))
