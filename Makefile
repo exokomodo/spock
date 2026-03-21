@@ -129,8 +129,15 @@ check/format: ## Check code formatting with cljfmt
 	$(LEIN) cljfmt check
 
 .PHONY: clean
-clean: ## Clean the project
+clean: clean/clojure clean/shaders ## Clean the project
+
+.PHONY: clean/clojure
+clean/clojure: ## Clean Clojure build artifacts
 	$(LEIN) clean
+
+.PHONY: clean/shaders
+clean/shaders: ## Clean compiled shader files
+	find src examples -type f -name "*.spv" -delete
 
 .PHONY: deps
 deps: ## Install project dependencies
