@@ -144,7 +144,7 @@
     (when (or (input/key-pressed? :space)
               (input/mouse-pressed? 0))
       (when-let [snd (:sound/shoot @state)]
-        (audio/play! snd :gain 0.5))
+        (audio/play! snd :gain 0.25))
       (swap! state
              (fn [s]
                (let [new-bullets
@@ -244,7 +244,7 @@
                ;; Play hit sound for each enemy destroyed
                (when (pos? @score-gain)
                  (when-let [snd (:sound/hit s)]
-                   (audio/play! snd)))
+                   (audio/play! snd :gain 0.25)))
 
                ;; Planet hit → request scene swap (after state is updated)
                (when planet-hit?
