@@ -29,7 +29,13 @@
                  [org.lwjgl/lwjgl-stb "3.3.4" :classifier "natives-linux-arm64"]
                  [org.lwjgl/lwjgl-stb "3.3.4" :classifier "natives-linux"]
                  [org.lwjgl/lwjgl-stb "3.3.4" :classifier "natives-macos"]
-                 [org.lwjgl/lwjgl-stb "3.3.4" :classifier "natives-macos-arm64"]]
+                 [org.lwjgl/lwjgl-stb "3.3.4" :classifier "natives-macos-arm64"]
+                 ;; shaderc — in-process GLSL → SPIR-V compilation (replaces glslc subprocess)
+                 [org.lwjgl/lwjgl-shaderc "3.3.4"]
+                 [org.lwjgl/lwjgl-shaderc "3.3.4" :classifier "natives-linux-arm64"]
+                 [org.lwjgl/lwjgl-shaderc "3.3.4" :classifier "natives-linux"]
+                 [org.lwjgl/lwjgl-shaderc "3.3.4" :classifier "natives-macos"]
+                 [org.lwjgl/lwjgl-shaderc "3.3.4" :classifier "natives-macos-arm64"]]
   ;; Note: lwjgl-vulkan has no natives — it uses the system Vulkan loader (libvulkan.so)
 
   :source-paths ["src"]
