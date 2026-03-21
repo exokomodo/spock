@@ -41,7 +41,7 @@ ifeq ($(OS),Darwin)
   export JVM_OPTS := -Dorg.lwjgl.vulkan.libname=$(VULKAN_LOADER) $(JVM_OPTS)
 endif
 
-GLSLC := glslc -Werror
+GLSLC := $(shell which glslc) -Werror
 
 ##@ Setup environment
 
