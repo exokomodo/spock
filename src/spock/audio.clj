@@ -33,10 +33,10 @@
 (defn init!
   "Open the default OpenAL device, create and activate a context."
   []
-  (let [device (ALC10/alcOpenDevice ^CharSequence nil)
+  (let [device (ALC10/nalcOpenDevice 0)
         _ (when (= device 0)
             (throw (RuntimeException. "OpenAL: failed to open device")))
-        context (ALC10/alcCreateContext device ^org.lwjgl.system.MemoryStack nil)
+        context (ALC10/alcCreateContext device (identity nil))
         _ (when (= context 0)
             (throw (RuntimeException. "OpenAL: failed to create context")))]
     (ALC10/alcMakeContextCurrent context)
