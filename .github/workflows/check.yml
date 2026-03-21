@@ -39,8 +39,8 @@ jobs:
 
       - name: Check formatting
         run: |
-          make check
+          make check/format
 
-      - name: Compile shaders
+      - name: Check shader compilation
         run: |
-          make build/shaders
+          make check/shaders
