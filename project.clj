@@ -61,9 +61,20 @@
                                (conj "-XstartOnFirstThread"
                                      (str "-Dorg.lwjgl.vulkan.libname="
                                           (or (System/getenv "VULKAN_LOADER")
-                                              "/usr/local/lib/libvulkan.1.dylib"))))}}
+                                              "/usr/local/lib/libvulkan.1.dylib"))))}
+   :teapot {:main spock.main
+            :aot [spock.main]
+            :source-paths ["src" "examples" "examples/teapot/scripts"]
+            :jvm-opts ~(cond-> ["-Dorg.lwjgl.library.path=natives"]
+                         (= "Mac OS X" (System/getProperty "os.name"))
+                         (conj "-XstartOnFirstThread"
+                               (str "-Dorg.lwjgl.vulkan.libname="
+                                    (or (System/getenv "VULKAN_LOADER")
+                                        "/usr/local/lib/libvulkan.1.dylib"))))}}
 
   :aliases
   {"hello"        ["with-profile" "hello" "run" "--" "examples/hello/game.edn"]
    "spin-shooter" ["with-profile" "spin-shooter" "run" "--"
-                   "examples/spin_shooter/game.edn"]})
+                   "examples/spin_shooter/game.edn"]
+   "teapot"       ["with-profile" "teapot" "run" "--"
+                   "examples/teapot/game.edn"]})
