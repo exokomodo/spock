@@ -28,4 +28,13 @@
    :renderable {:type   :polygon
                 :sides  5
                 :radius 0.05
-                :color  [1.0 0.3 0.3 1.0]}}]}
+                :color  [1.0 0.3 0.3 1.0]}}
+
+  {:id         :score-r
+   :renderable {:type  :text
+                :font  "examples/assets/fonts/mono.fnt"
+                :text  "Score: 0"
+                :x     -0.95
+                :y     -0.85
+                :size  0.07
+                :color [1.0 1.0 1.0 1.0]}}]}
