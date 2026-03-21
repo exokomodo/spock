@@ -15,7 +15,8 @@
    - stop?     volatile! — set true by main thread when window closes;
                            checked every frame by render thread
    - error-p   promise — render thread delivers any frame-loop exception here"
-  (:require [spock.renderer.core :as renderer]
+  (:require [spock.audio :as audio]
+            [spock.renderer.core :as renderer]
             [spock.renderer.vulkan :as vk]
             [spock.entity :as entity]
             [spock.input.core :as input]
@@ -144,6 +145,7 @@
       (let [ready-val @ready-p]
         (when (instance? Exception ready-val)
           (throw ready-val)))
+      (audio/init!)
       (on-init! lifecycle)
       (swap! (:state game) assoc :running? true)
       (loop [last-t (System/nanoTime)]
