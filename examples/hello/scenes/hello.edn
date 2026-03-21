@@ -19,5 +19,5 @@
              :renderable {:type  :text
                           :font  "examples/assets/fonts/mono.fnt"
                           :text  "Hello Vulkan"
-                          :size  0.05
+                          :size  0.12
                           :color [1.0 1.0 1.0 1.0]}}]}
