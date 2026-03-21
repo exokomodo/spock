@@ -164,40 +164,44 @@
                         (let [cid   (int ch)
                               glyph (get glyphs cid (get glyphs (int \space)))]
                           (when glyph
-                            (let [gw    (double (:width glyph))
-                                  gh    (double (:height glyph))
-                                  uv-x  (/ (double (:x glyph)) sw)
-                                  uv-y  (/ (double (:y glyph)) sh)
-                                  uv-w  (/ gw sw)
-                                  uv-h  (/ gh sh)
-                                  ndc-h sz
-                                  ndc-w (* sz (/ gw (max 1.0 gh)))
-                                  ndc-x @cur-x
-                                  ndc-y (- (double (or y 0.0)) ndc-h)]
-                              (.clear pc-buf)
-                              (.putFloat pc-buf (float ndc-x))
-                              (.putFloat pc-buf (float ndc-y))
-                              (.putFloat pc-buf (float ndc-w))
-                              (.putFloat pc-buf (float ndc-h))
-                              (.putFloat pc-buf (float uv-x))
-                              (.putFloat pc-buf (float uv-y))
-                              (.putFloat pc-buf (float uv-w))
-                              (.putFloat pc-buf (float uv-h))
-                              (.putFloat pc-buf (float (nth c 0 1.0)))
-                              (.putFloat pc-buf (float (nth c 1 1.0)))
-                              (.putFloat pc-buf (float (nth c 2 1.0)))
-                              (.putFloat pc-buf (float (nth c 3 1.0)))
-                              (.flip pc-buf)
-                              (pipeline/push-constants!
-                               command-buffer
-                               (long layout)
-                               (bit-or VK10/VK_SHADER_STAGE_VERTEX_BIT
-                                       VK10/VK_SHADER_STAGE_FRAGMENT_BIT)
-                               pc-buf)
-                              (VK10/vkCmdDraw
-                               ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-                               6 1 0 0)
-                              (swap! cur-x + ndc-w))))))))))))
+                            (let [gw     (double (or (:width glyph) 0))
+                                  gh     (double (or (:height glyph) 0))
+                                  xadv   (double (or (:xadvance glyph) gw))
+                                  line-h (double (or (:line-height fnt) 1))
+                                  ndc-adv (* sz (/ xadv line-h))
+                                  ndc-h   (* sz (/ gh (max 1.0 line-h)))
+                                  ndc-w   (* sz (/ gw (max 1.0 line-h)))
+                                  ndc-x   @cur-x
+                                  ndc-y   (- (double (or y 0.0)) ndc-h)]
+                              (when (and (pos? gw) (pos? gh))
+                                (let [uv-x (/ (double (:x glyph)) sw)
+                                      uv-y (/ (double (:y glyph)) sh)
+                                      uv-w (/ gw sw)
+                                      uv-h (/ gh sh)]
+                                  (.clear pc-buf)
+                                  (.putFloat pc-buf (float ndc-x))
+                                  (.putFloat pc-buf (float ndc-y))
+                                  (.putFloat pc-buf (float ndc-w))
+                                  (.putFloat pc-buf (float ndc-h))
+                                  (.putFloat pc-buf (float uv-x))
+                                  (.putFloat pc-buf (float uv-y))
+                                  (.putFloat pc-buf (float uv-w))
+                                  (.putFloat pc-buf (float uv-h))
+                                  (.putFloat pc-buf (float (nth c 0 1.0)))
+                                  (.putFloat pc-buf (float (nth c 1 1.0)))
+                                  (.putFloat pc-buf (float (nth c 2 1.0)))
+                                  (.putFloat pc-buf (float (nth c 3 1.0)))
+                                  (.flip pc-buf)
+                                  (pipeline/push-constants!
+                                   command-buffer
+                                   (long layout)
+                                   (bit-or VK10/VK_SHADER_STAGE_VERTEX_BIT
+                                           VK10/VK_SHADER_STAGE_FRAGMENT_BIT)
+                                   pc-buf)
+                                  (VK10/vkCmdDraw
+                                   ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                                   6 1 0 0)))
+                              (swap! cur-x + ndc-adv))))))))))))
 
         (cleanup! [_this device]
           (when-let [dp @desc-pool-atom]
