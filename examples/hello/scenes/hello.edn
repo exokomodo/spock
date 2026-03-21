@@ -2,9 +2,7 @@
  :script hello.scripts.hello
 
  :entities [{:id         :triangle
-             :renderable {:type    :triangle
-                          :shaders {:vert "examples/hello/shaders/triangle.vert"
-                                    :frag "examples/hello/shaders/triangle.frag"}}}
+             :renderable {:type :triangle}}
             {:id         :logo
              :renderable {:type   :sprite
                           :image  "examples/hello/assets/images/hello.png"

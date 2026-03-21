@@ -6,6 +6,26 @@
   (:require [spock.shader.dsl :as dsl]))
 
 ;; ---------------------------------------------------------------------------
+;; Triangle shaders (hello example default)
+;;   Hardcoded RGB triangle — no vertex buffer, positions/colors in shader
+;; ---------------------------------------------------------------------------
+
+(dsl/defshader triangle-vert :vertex
+  {:outputs [{:name :frag-color :type :vec3 :location 0}]
+   :const-arrays
+   [{:name :positions :type :vec2 :size 3
+     :values ['(vec2 0.0 -0.5) '(vec2 0.5 0.5) '(vec2 -0.5 0.5)]}
+    {:name :colors :type :vec3 :size 3
+     :values ['(vec3 1.0 0.0 0.0) '(vec3 0.0 1.0 0.0) '(vec3 0.0 0.0 1.0)]}]}
+  (set! gl-Position (vec4 (aget positions gl-VertexIndex) 0.0 1.0))
+  (set! frag-color (aget colors gl-VertexIndex)))
+
+(dsl/defshader triangle-frag :fragment
+  {:inputs  [{:name :frag-color :type :vec3 :location 0}]
+   :outputs [{:name :out-color  :type :vec4 :location 0}]}
+  (set! out-color (vec4 frag-color 1.0)))
+
+;; ---------------------------------------------------------------------------
 ;; Polygon shaders
 ;; ---------------------------------------------------------------------------
 
