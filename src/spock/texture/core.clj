@@ -338,7 +338,7 @@
             ;; --- Staging buffer ---
             staging-host-props (bit-or VK10/VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                        VK10/VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
-            staging-usage      (bit-or VK10/VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+            staging-usage      (bit-or VK10/VK_BUFFER_USAGE_TRANSFER_SRC_BIT 0)
             {:keys [buffer staging-memory]}
             (let [sb (create-buffer! device pd img-size staging-usage staging-host-props)]
               {:buffer (:buffer sb) :staging-memory (:memory sb)})
