@@ -84,3 +84,13 @@
                            (set! frag-color (.color pc))]})]
       (is (some? buf))
       (is (pos? (.capacity buf))))))
+
+(deftest edn-inline-shader-round-trip
+  (testing "DSL descriptor read from EDN string compiles to SPIR-V"
+    (let [edn-str "{:outputs [{:name :frag-color :type :vec3 :location 0}]
+                    :main [(set! gl-Position (vec4 0.0 0.0 0.0 1.0))
+                           (set! frag-color (vec3 1.0 0.0 0.0))]}"
+          descriptor (clojure.edn/read-string edn-str)
+          buf (dsl/compile-shader (assoc descriptor :stage :vertex))]
+      (is (some? buf))
+      (is (pos? (.capacity buf))))))
