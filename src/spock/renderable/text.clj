@@ -240,7 +240,7 @@
       (log/log "text/build-pipeline! glyphs=" (count (:glyphs fnt)))
 
       ;; 2. Load atlas texture
-      (let [tx (texture/load-texture! renderer (:image-path fnt))]
+      (let [tx (texture/load-texture! renderer (:atlas-path fnt))]
         (reset! texture-atom tx)
 
         ;; 3. Descriptor set layout
