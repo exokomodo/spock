@@ -45,7 +45,8 @@ _GLSLC = $(shell which glslc)
 ifeq ($(_GLSLC),)
   $(warning "glslc shader compiler not found in PATH. Please install it (e.g. via 'make setup/glslc') and ensure it's available in your PATH.")
 endif
-GLSLC = $(_GLSLC) -Werror
+GLSLC_ARGS := -Werror
+
 LEIN = $(shell which lein)
 ifeq ($(LEIN),)
   $(warning "Leiningen not found in PATH. Please install it (e.g. via 'make setup/lein') and ensure it's available in your PATH.")
@@ -96,14 +97,14 @@ build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite #
 .PHONY: build/shaders/engine/polygon
 build/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
 	set -v
-	$(GLSLC) src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
-	$(GLSLC) src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
 
 .PHONY: build/shaders/engine/sprite
 build/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite renderable)
 	set -v
-	$(GLSLC) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
-	$(GLSLC) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
 
 .PHONY: build/shaders/examples
 build/shaders/examples: build/shaders/examples/hello ## Build example shaders
@@ -111,8 +112,8 @@ build/shaders/examples: build/shaders/examples/hello ## Build example shaders
 .PHONY: build/shaders/examples/hello
 build/shaders/examples/hello: ## Compile the hello example shaders
 	set -v
-	$(GLSLC) examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
-	$(GLSLC) examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
+	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
 
 .PHONY: check
 check: check/format ## Check code quality
