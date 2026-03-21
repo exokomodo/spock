@@ -75,7 +75,7 @@ build/all: build/shaders ## Compile examples
 	lein with-profile spin-shooter compile
 
 .PHONY: build/shaders
-build/shaders: build/shaders/polygon build/shaders/hello ## Build engine shaders
+build/shaders: build/shaders/polygon build/shaders/sprite build/shaders/hello ## Build engine shaders
 
 .PHONY: build/shaders/hello
 build/shaders/hello:
@@ -86,6 +86,11 @@ build/shaders/hello:
 build/shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
 	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
 	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+
+.PHONY: build/shaders/sprite
+build/shaders/sprite: ## Compile the sprite shaders (used by :sprite renderable)
+	glslc src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
+	glslc src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
 
 .PHONY: check
 check: check/format ## Check code quality
