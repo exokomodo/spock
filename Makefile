@@ -45,12 +45,13 @@ GLSLC = $(shell which glslc)
 ifeq ($(GLSLC),)
   $(warning "glslc shader compiler not found in PATH. Please install it (e.g. via 'make setup/glslc') and ensure it's available in your PATH.")
 endif
-GLSLC_ARGS := -Werror
+GLSLC_ARGS ?= -Werror
 
 LEIN = $(shell which lein)
 ifeq ($(LEIN),)
   $(warning "Leiningen not found in PATH. Please install it (e.g. via 'make setup/lein') and ensure it's available in your PATH.")
 endif
+LEIN_RUN_ARGS ?= 
 
 ##@ Setup environment
 
@@ -181,11 +182,11 @@ test: ## Run tests
 
 .PHONY: run/hello
 run/hello: build/shaders ## Run the hello example
-	$(DISPLAY_PREFIX) $(LEIN) hello
+	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) hello
 
 .PHONY: run/spin-shooter
 run/spin-shooter: build/shaders ## Run the spin-shooter example
-	$(DISPLAY_PREFIX) $(LEIN) spin-shooter
+	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) spin-shooter
 
 ##@ Utilities
 

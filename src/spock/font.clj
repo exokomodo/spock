@@ -2,9 +2,9 @@
   "AngelCode .fnt bitmap font loader.
 
    Usage:
-     (def font (font/load! \"assets/fonts/mono.fnt\"))
+     (def font (font/load! \"examples/assets/fonts/mono.fnt\"))
      ;; font is a map:
-     ;;   {:atlas-path  \"assets/fonts/mono.png\"
+     ;;   {:atlas-path  \"examples/assets/fonts/mono.png\"
      ;;    :line-height int
      ;;    :base        int
      ;;    :atlas-w     int

@@ -5,7 +5,7 @@
 
    Configuration:
      {:type  :text
-      :font  \"assets/fonts/mono.fnt\"
+      :font  \"examples/assets/fonts/mono.fnt\"
       :text  \"Hello\"
       :size  0.05
       :color [r g b a]}
