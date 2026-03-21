@@ -8,6 +8,7 @@
   (:require [spock.scene  :as scene]
             [spock.entity :as entity]
             [spock.renderable.polygon :as polygon]
+            [spock.renderable.text :as text]
             [spock.input.core :as input]
             [spock.renderer.core :as renderer]
             [spock.audio.core :as audio]
@@ -307,7 +308,16 @@
                           {:x (:x e) :y (:y e)
                            :rotation (:angle e)
                            :color [1.0 0.3 0.3 1.0]})
-                        (:enemies s))))))))
+                        (:enemies s)))))
+
+      ;; Score
+      (when-let [r (find-r :score-r)]
+        (when-let [inst (text/instances r)]
+          (reset! inst [{:text  (str "Score: " (:score s))
+                         :x     -0.95
+                         :y     -0.85
+                         :size  0.07
+                         :color [1.0 1.0 1.0 1.0]}]))))))
 
 ;; ---------------------------------------------------------------------------
 ;; on-done

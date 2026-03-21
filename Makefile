@@ -45,12 +45,13 @@ GLSLC = $(shell which glslc)
 ifeq ($(GLSLC),)
   $(warning "glslc shader compiler not found in PATH. Please install it (e.g. via 'make setup/glslc') and ensure it's available in your PATH.")
 endif
-GLSLC_ARGS := -Werror
+GLSLC_ARGS ?= -Werror
 
 LEIN = $(shell which lein)
 ifeq ($(LEIN),)
   $(warning "Leiningen not found in PATH. Please install it (e.g. via 'make setup/lein') and ensure it's available in your PATH.")
 endif
+LEIN_RUN_ARGS ?= 
 
 ##@ Setup environment
 
@@ -92,7 +93,7 @@ build/engine: build/shaders/engine ## Build the engine alone
 build/shaders: build/shaders/engine build/shaders/examples ## Build all shaders
 
 .PHONY: build/shaders/engine
-build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite ## Build engine shaders
+build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite build/shaders/engine/text ## Build engine shaders
 
 .PHONY: build/shaders/engine/polygon
 build/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
@@ -105,6 +106,12 @@ build/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite rend
 	set -v
 	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
 	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+
+.PHONY: build/shaders/engine/text
+build/shaders/engine/text: ## Compile the text shaders (used by :text renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.vert -o src/shaders/text.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.frag -o src/shaders/text.frag.spv
 
 .PHONY: build/shaders/examples
 build/shaders/examples: build/shaders/examples/hello ## Build example shaders
@@ -123,8 +130,15 @@ check/format: ## Check code formatting with cljfmt
 	$(LEIN) cljfmt check
 
 .PHONY: clean
-clean: ## Clean the project
+clean: clean/clojure clean/shaders ## Clean the project
+
+.PHONY: clean/clojure
+clean/clojure: ## Clean Clojure build artifacts
 	$(LEIN) clean
+
+.PHONY: clean/shaders
+clean/shaders: ## Clean compiled shader files
+	find src examples -type f -name "*.spv" -delete
 
 .PHONY: deps
 deps: ## Install project dependencies
@@ -168,11 +182,11 @@ test: ## Run tests
 
 .PHONY: run/hello
 run/hello: build/shaders ## Run the hello example
-	$(DISPLAY_PREFIX) $(LEIN) hello
+	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) hello
 
 .PHONY: run/spin-shooter
 run/spin-shooter: build/shaders ## Run the spin-shooter example
-	$(DISPLAY_PREFIX) $(LEIN) spin-shooter
+	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) spin-shooter
 
 ##@ Utilities
 

@@ -250,7 +250,7 @@
 
 (defn- copy-buffer-to-image!
   "Record a vkCmdCopyBufferToImage command."
-  [^VkCommandBuffer cb ^long src-buffer ^long dst-image width height]
+  [^VkCommandBuffer cb src-buffer dst-image width height]
   (let [stack (MemoryStack/stackPush)]
     (try
       (let [region (doto (VkBufferImageCopy/calloc 1 stack)
