@@ -130,7 +130,7 @@
                 fnt  @font-atom]
             (when (and pl dset fnt)
               (let [{:keys [pipeline layout]} pl
-                    {:keys [glyphs scale-w scale-h]} fnt]
+                    {:keys [glyphs atlas-w atlas-h]} fnt]
                 (VK10/vkCmdBindPipeline
                  ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
                  VK10/VK_PIPELINE_BIND_POINT_GRAPHICS
@@ -155,8 +155,8 @@
                   (doseq [{:keys [text x y size color]} draw-list]
                     (let [sz    (double (or size def-size))
                           c     (vec (or color def-color))
-                          sw    (double scale-w)
-                          sh    (double scale-h)
+                          sw    (double atlas-w)
+                          sh    (double atlas-h)
                           cur-x (atom (double (or x 0.0)))]
                       (doseq [ch (seq (str text))]
                         (let [cid   (int ch)
