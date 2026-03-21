@@ -23,6 +23,11 @@
             VkSubmitInfo VkPresentInfoKHR
             VkClearValue VkOffset2D VkExtent2D VkViewport VkRect2D
             KHRSurface KHRSwapchain]
+           [org.lwjgl.vulkan
+            VkImageCreateInfo
+            VkMemoryAllocateInfo VkMemoryRequirements
+            VkPhysicalDeviceMemoryProperties
+            VkPipelineDepthStencilStateCreateInfo]
            [org.lwjgl.glfw GLFW GLFWVulkan]))
 
 ;; ---------------------------------------------------------------------------
@@ -62,6 +67,9 @@
    :render-finished  []        ; [long semaphore]
    :in-flight-fences []        ; [long fence]
    :current-frame    0
+   :depth-image      VK_NULL   ; long handle
+   :depth-memory     VK_NULL   ; long handle
+   :depth-view       VK_NULL   ; long handle
    :clear-color      [0.1 0.12 0.18 1.0]
    :window-handle    nil       ; long (GLFW window)
    :width            1280
@@ -346,13 +354,88 @@
     views))
 
 ;; ---------------------------------------------------------------------------
+;; Depth buffer
+;; ---------------------------------------------------------------------------
+(def ^:private VK_FORMAT_D32_SFLOAT 126)
+
+(defn- find-memory-type-idx
+  [^org.lwjgl.vulkan.VkPhysicalDevice pd type-filter required-props]
+  (let [stack (MemoryStack/stackPush)]
+    (try
+      (let [props (VkPhysicalDeviceMemoryProperties/malloc stack)]
+        (VK10/vkGetPhysicalDeviceMemoryProperties pd props)
+        (loop [i 0]
+          (if (>= i (.memoryTypeCount props))
+            (throw (RuntimeException. "No suitable memory type for depth buffer"))
+            (let [flags (.propertyFlags (.get (.memoryTypes props) i))]
+              (if (and (not= 0 (bit-and (int type-filter) (bit-shift-left 1 i)))
+                       (= (int required-props) (bit-and (int flags) (int required-props))))
+                i
+                (recur (inc i)))))))
+      (finally (MemoryStack/stackPop)))))
+
+(defn- create-depth-resources! [state]
+  (let [^VkDevice dev (:device @state)
+        pd  (:physical-device @state)
+        ext (:swapchain-extent @state)
+        w   (int (:width ext))
+        h   (int (:height ext))
+        stack (MemoryStack/stackPush)]
+    (try
+      (let [ici (doto (VkImageCreateInfo/calloc stack)
+                  (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO)
+                  (.imageType VK10/VK_IMAGE_TYPE_2D)
+                  (.format (int VK_FORMAT_D32_SFLOAT))
+                  (.mipLevels 1)
+                  (.arrayLayers 1)
+                  (.samples VK10/VK_SAMPLE_COUNT_1_BIT)
+                  (.tiling VK10/VK_IMAGE_TILING_OPTIMAL)
+                  (.usage VK10/VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                  (.sharingMode VK10/VK_SHARING_MODE_EXCLUSIVE)
+                  (.initialLayout VK10/VK_IMAGE_LAYOUT_UNDEFINED))
+            _ (doto (.extent ici)
+                (.width w) (.height h) (.depth 1))
+            lp (.mallocLong stack 1)
+            _  (vk-check (VK10/vkCreateImage dev ici nil lp) "vkCreateImage (depth) failed")
+            img (.get lp 0)
+            mr  (VkMemoryRequirements/malloc stack)
+            _   (VK10/vkGetImageMemoryRequirements dev img mr)
+            mai (doto (VkMemoryAllocateInfo/calloc stack)
+                  (.sType VK10/VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
+                  (.allocationSize (.size mr))
+                  (.memoryTypeIndex (find-memory-type-idx
+                                     pd (.memoryTypeBits mr)
+                                     VK10/VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)))
+            _   (.rewind lp)
+            _   (vk-check (VK10/vkAllocateMemory dev mai nil lp) "vkAllocateMemory (depth) failed")
+            mem (.get lp 0)
+            _   (VK10/vkBindImageMemory dev img mem 0)
+            vci (doto (VkImageViewCreateInfo/calloc stack)
+                  (.sType VK10/VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO)
+                  (.image img)
+                  (.viewType VK10/VK_IMAGE_VIEW_TYPE_2D)
+                  (.format (int VK_FORMAT_D32_SFLOAT)))
+            _   (doto (.subresourceRange vci)
+                  (.aspectMask VK10/VK_IMAGE_ASPECT_DEPTH_BIT)
+                  (.baseMipLevel 0) (.levelCount 1)
+                  (.baseArrayLayer 0) (.layerCount 1))
+            _   (.rewind lp)
+            _   (vk-check (VK10/vkCreateImageView dev vci nil lp) "vkCreateImageView (depth) failed")]
+        (swap! state assoc
+               :depth-image img
+               :depth-memory mem
+               :depth-view (.get lp 0)))
+      (finally (MemoryStack/stackPop)))))
+
+;; ---------------------------------------------------------------------------
 ;; Render pass
 ;; ---------------------------------------------------------------------------
 (defn- create-render-pass! [state]
   (let [^MemoryStack stack (MemoryStack/stackPush)
         ^VkDevice dev (:device @state)
         fmt  (int (:swapchain-format @state))
-        att  (doto (VkAttachmentDescription/callocStack 1 stack)
+        ;; Two attachments: color (0) + depth (1)
+        atts (doto (VkAttachmentDescription/callocStack 2 stack)
                (-> (.get 0)
                    (doto (.format fmt)
                      (.samples VK10/VK_SAMPLE_COUNT_1_BIT)
@@ -361,30 +444,46 @@
                      (.stencilLoadOp VK10/VK_ATTACHMENT_LOAD_OP_DONT_CARE)
                      (.stencilStoreOp VK10/VK_ATTACHMENT_STORE_OP_DONT_CARE)
                      (.initialLayout VK10/VK_IMAGE_LAYOUT_UNDEFINED)
-                     (.finalLayout KHRSwapchain/VK_IMAGE_LAYOUT_PRESENT_SRC_KHR))))
-        cref (doto (VkAttachmentReference/callocStack stack)
-               (.attachment 0)
-               (.layout VK10/VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))
+                     (.finalLayout KHRSwapchain/VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)))
+               (-> (.get 1)
+                   (doto (.format (int VK_FORMAT_D32_SFLOAT))
+                     (.samples VK10/VK_SAMPLE_COUNT_1_BIT)
+                     (.loadOp VK10/VK_ATTACHMENT_LOAD_OP_CLEAR)
+                     (.storeOp VK10/VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                     (.stencilLoadOp VK10/VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+                     (.stencilStoreOp VK10/VK_ATTACHMENT_STORE_OP_DONT_CARE)
+                     (.initialLayout VK10/VK_IMAGE_LAYOUT_UNDEFINED)
+                     (.finalLayout VK10/VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL))))
         cref-buf (doto (VkAttachmentReference/callocStack 1 stack)
                    (-> (.get 0)
                        (doto (.attachment 0)
                          (.layout VK10/VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL))))
+        dref (doto (VkAttachmentReference/callocStack stack)
+               (.attachment 1)
+               (.layout VK10/VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL))
         sub  (doto (VkSubpassDescription/callocStack 1 stack)
                (-> (.get 0)
                    (doto (.pipelineBindPoint VK10/VK_PIPELINE_BIND_POINT_GRAPHICS)
                      (.colorAttachmentCount 1)
-                     (.pColorAttachments cref-buf))))
+                     (.pColorAttachments cref-buf)
+                     (.pDepthStencilAttachment dref))))
         dep  (doto (VkSubpassDependency/callocStack 1 stack)
                (-> (.get 0)
                    (doto (.srcSubpass VK10/VK_SUBPASS_EXTERNAL)
                      (.dstSubpass 0)
-                     (.srcStageMask VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
+                     (.srcStageMask (bit-or
+                                     VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                                     VK10/VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT))
                      (.srcAccessMask 0)
-                     (.dstStageMask VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-                     (.dstAccessMask VK10/VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))))
+                     (.dstStageMask (bit-or
+                                     VK10/VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                                     VK10/VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT))
+                     (.dstAccessMask (bit-or
+                                      VK10/VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+                                      VK10/VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT)))))
         ci   (doto (VkRenderPassCreateInfo/calloc stack)
                (.sType VK10/VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO)
-               (.pAttachments att)
+               (.pAttachments atts)
                (.pSubpasses sub)
                (.pDependencies dep))
         lp   (.mallocLong stack 1)
@@ -402,14 +501,16 @@
         rp   (long (:render-pass @state))
         ext  (:swapchain-extent @state)
         lp   (.mallocLong stack 1)
-        ab   (.mallocLong stack 1)
+        ;; Two attachments per framebuffer: color view + shared depth view
+        ab   (.mallocLong stack 2)
+        dv   (long (:depth-view @state))
         fbs  (mapv (fn [view]
-                     (.put ab 0 (long view)) (.rewind ab)
+                     (doto ab (.put 0 (long view)) (.put 1 dv) (.rewind))
                      (.rewind lp)
                      (let [ci (doto (VkFramebufferCreateInfo/calloc stack)
                                 (.sType VK10/VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO)
                                 (.renderPass rp)
-                                (.attachmentCount 1)
+                                (.attachmentCount 2)
                                 (.pAttachments ab)
                                 (.width  (int (:width ext)))
                                 (.height (int (:height ext)))
@@ -490,16 +591,20 @@
         bi   (doto (VkCommandBufferBeginInfo/calloc stack)
                (.sType VK10/VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO))
         _    (vk-check (VK10/vkBeginCommandBuffer cb bi) "vkBeginCommandBuffer failed")
-        cv   (VkClearValue/callocStack 1 stack)
+        ;; Two clear values: color (attachment 0) + depth (attachment 1)
+        cv   (VkClearValue/callocStack 2 stack)
         _    (doto (.color (.get cv 0))
                (.float32 0 (float (nth cc 0)))
                (.float32 1 (float (nth cc 1)))
                (.float32 2 (float (nth cc 2)))
                (.float32 3 (float (nth cc 3))))
+        _    (doto (.depthStencil (.get cv 1))
+               (.depth 1.0) (.stencil 0))
         rbi  (doto (VkRenderPassBeginInfo/calloc stack)
                (.sType VK10/VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO)
                (.renderPass rp)
                (.framebuffer fb)
+               (.clearValueCount 2)
                (.pClearValues cv))
         _    (doto (.renderArea rbi)
                (.offset (doto (VkOffset2D/calloc stack) (.set 0 0)))
@@ -586,8 +691,16 @@
   (let [^VkDevice dev (:device @state)]
     (doseq [fb (:framebuffers @state)]   (VK10/vkDestroyFramebuffer  dev (long fb) nil))
     (doseq [iv (:swapchain-views @state)] (VK10/vkDestroyImageView   dev (long iv) nil))
+    (when (not= VK_NULL (:depth-view @state))
+      (VK10/vkDestroyImageView  dev (long (:depth-view @state)) nil))
+    (when (not= VK_NULL (:depth-image @state))
+      (VK10/vkDestroyImage      dev (long (:depth-image @state)) nil))
+    (when (not= VK_NULL (:depth-memory @state))
+      (VK10/vkFreeMemory        dev (long (:depth-memory @state)) nil))
     (KHRSwapchain/vkDestroySwapchainKHR dev (long (:swapchain @state)) nil)
-    (swap! state assoc :framebuffers [] :swapchain-views [] :swapchain VK_NULL)))
+    (swap! state assoc
+           :framebuffers [] :swapchain-views [] :swapchain VK_NULL
+           :depth-view VK_NULL :depth-image VK_NULL :depth-memory VK_NULL)))
 
 (defn- full-cleanup! [state]
   (let [^VkDevice   dev  (:device @state)
@@ -637,6 +750,7 @@
       (create-logical-device! state)
       (create-swapchain! state)
       (create-image-views! state)
+      (create-depth-resources! state)
       (create-render-pass! state)
       (create-framebuffers! state)
       (create-command-pool! state)
