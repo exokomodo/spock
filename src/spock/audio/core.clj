@@ -143,30 +143,28 @@
 
 (defn play!
   "Play a one-shot sound from buffer sound-id.
-   Optional gain (0.0–1.0, default 1.0).
+   Options: :gain (0.0–1.0, default 1.0).
    The source is automatically cleaned up in tick! once it finishes."
-  (^long [^long sound-id] (play! sound-id 1.0))
-  (^long [^long sound-id gain]
-   (let [src (long (AL10/alGenSources))]
-     (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
-     (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
-     (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_FALSE)
-     (AL10/alSourcePlay (int src))
-     (swap! sources assoc src :one-shot)
-     src)))
+  ^long [^long sound-id & {:keys [gain] :or {gain 1.0}}]
+  (let [src (long (AL10/alGenSources))]
+    (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
+    (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
+    (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_FALSE)
+    (AL10/alSourcePlay (int src))
+    (swap! sources assoc src :one-shot)
+    src))
 
 (defn loop!
   "Play a looping sound from buffer sound-id. Returns source-id (long).
-   Optional gain (0.0–1.0, default 1.0). Caller must call stop! to end looping."
-  (^long [^long sound-id] (loop! sound-id 1.0))
-  (^long [^long sound-id gain]
-   (let [src (long (AL10/alGenSources))]
-     (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
-     (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
-     (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_TRUE)
-     (AL10/alSourcePlay (int src))
-     (swap! sources assoc src :loop)
-     (long src))))
+   Options: :gain (0.0–1.0, default 1.0). Caller must call stop! to end looping."
+  ^long [^long sound-id & {:keys [gain] :or {gain 1.0}}]
+  (let [src (long (AL10/alGenSources))]
+    (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
+    (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
+    (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_TRUE)
+    (AL10/alSourcePlay (int src))
+    (swap! sources assoc src :loop)
+    (long src)))
 
 (defn stop!
   "Stop and delete a source."

@@ -18,7 +18,7 @@
                        (filter #(= (:id %) :beep))
                        first
                        (#(entity/get-component % :audio)))]
-    (audio/play! beep 0.15)))
+    (audio/play! beep :gain 0.15)))
 
 (defn on-tick [game scene delta shared-state]
   (let [r      (:renderer game)
