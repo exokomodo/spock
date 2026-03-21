@@ -1,0 +1,5 @@
+{:entry    :teapot
+ :settings "examples/teapot/settings.edn"
+ :state    {}
+
+ :scenes [{:name :teapot :file "examples/teapot/scenes/teapot.edn"}]}
