@@ -113,6 +113,8 @@
         def-text         (or (:text cfg) "")
         def-size         (double (or (:size cfg) 0.05))
         def-color        (vec (or (:color cfg) [1.0 1.0 1.0 1.0]))
+        def-x            (double (or (:x cfg) -0.9))
+        def-y            (double (or (:y cfg) 0.0))
         pipeline-atom    (atom nil)
         texture-atom     (atom nil)
         font-atom        (atom nil)
@@ -148,8 +150,8 @@
                       draw-list (if (seq insts)
                                   insts
                                   [{:text  def-text
-                                    :x     0.0
-                                    :y     0.0
+                                    :x     def-x
+                                    :y     def-y
                                     :size  def-size
                                     :color def-color}])]
                   (doseq [{:keys [text x y size color]} draw-list]
