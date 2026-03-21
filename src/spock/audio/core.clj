@@ -145,7 +145,7 @@
   "Play a one-shot sound from buffer sound-id.
    Options: :gain (0.0–1.0, default 1.0).
    The source is automatically cleaned up in tick! once it finishes."
-  ^long [^long sound-id & {:keys [gain] :or {gain 1.0}}]
+  [sound-id & {:keys [gain] :or {gain 1.0}}]
   (let [src (long (AL10/alGenSources))]
     (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
     (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
@@ -157,7 +157,7 @@
 (defn loop!
   "Play a looping sound from buffer sound-id. Returns source-id (long).
    Options: :gain (0.0–1.0, default 1.0). Caller must call stop! to end looping."
-  ^long [^long sound-id & {:keys [gain] :or {gain 1.0}}]
+  [sound-id & {:keys [gain] :or {gain 1.0}}]
   (let [src (long (AL10/alGenSources))]
     (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
     (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
