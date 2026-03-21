@@ -10,4 +10,8 @@
                           :image  "examples/hello/assets/images/hello.png"
                           :color  [1.0 1.0 1.0 1.0]
                           :width  0.4
-                          :height 0.4}}]}
+                          :height 0.4}}
+            {:id    :beep
+             :audio {:file "examples/hello/assets/audio/beep.wav"
+                     :loop false
+                     :gain 0.5}}]}

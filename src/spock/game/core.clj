@@ -15,10 +15,13 @@
    - stop?     volatile! — set true by main thread when window closes;
                            checked every frame by render thread
    - error-p   promise — render thread delivers any frame-loop exception here"
-  (:require [spock.renderer.core :as renderer]
-            [spock.renderer.vulkan :as vk]
-            [spock.entity :as entity]
-            [spock.input.core :as input])
+  (:require
+   [spock.renderer.core :as renderer]
+   [spock.renderer.vulkan :as vk]
+   [spock.entity :as entity]
+   [spock.input.core :as input]
+   [spock.audio.core :as audio]
+   [spock.settings :as settings])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -142,6 +145,8 @@
       (let [ready-val @ready-p]
         (when (instance? Exception ready-val)
           (throw ready-val)))
+      (audio/init!)
+      (audio/set-master-volume! (double (:master-volume @settings/settings 1.0)))
       (on-init! lifecycle)
       (swap! (:state game) assoc :running? true)
       (loop [last-t (System/nanoTime)]
@@ -158,9 +163,11 @@
             (on-tick! lifecycle delta)
             ;; Advance input state AFTER on-tick! so scripts see :pressed on the frame it fires
             (input/tick!)
+            (audio/tick!)
             (recur now))))
       (on-done! lifecycle)
       (finally
         (vreset! stop? true)
         (.join render-t 5000)
+        (audio/cleanup!)
         (destroy-window! game)))))

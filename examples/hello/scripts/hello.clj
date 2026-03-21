@@ -2,14 +2,23 @@
   "Lifecycle script for the Hello Vulkan scene.
    Animates the clear color and auto-closes after 5 seconds."
   (:require [spock.renderer.core :as renderer]
+            [spock.audio.core    :as audio]
+            [spock.scene         :as scene]
+            [spock.entity        :as entity]
             [spock.log           :as log])
   (:import [org.lwjgl.glfw GLFW]))
 
 (def ^:private state (atom {:dirs    [0.1 0.2 0.3 0.0]
-                             :elapsed 0.0}))
+                            :elapsed 0.0}))
 
 (defn on-init [game scene shared-state]
-  (log/log "hello.scripts.hello/on-init"))
+  (log/log "hello.scripts.hello/on-init")
+  ;; Play the beep once on scene start
+  (when-let [beep (->> (scene/get-entities scene)
+                       (filter #(= (:id %) :beep))
+                       first
+                       (#(entity/get-component % :audio)))]
+    (audio/play! beep :gain 0.15)))
 
 (defn on-tick [game scene delta shared-state]
   (let [r      (:renderer game)

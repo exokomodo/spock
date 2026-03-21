@@ -27,4 +27,8 @@
   (get-render-pass [this]
     "Return the VkRenderPass handle (long).")
   (get-device [this]
-    "Return the VkDevice."))
+    "Return the VkDevice.")
+  (get-command-pool [this]
+    "Return the VkCommandPool handle (long).")
+  (get-graphics-queue [this]
+    "Return the VkQueue used for graphics operations."))
