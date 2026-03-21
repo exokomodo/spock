@@ -50,11 +50,10 @@
   (when (= k :renderable)
     (let [m (meta v)]
       (cond
-        (contains? m :vert-path)    (spock.renderable.triangle/build-pipeline! v renderer)
-        (contains? m :vbuf-atom)    (spock.renderable.polygon/build-pipeline! v renderer)
-        (contains? m :font-path)    (spock.renderable.text/build-pipeline! v renderer)
-        (contains? m :image-path)   (spock.renderable.sprite/build-pipeline! v renderer)
-        (contains? m :font-path)    (spock.renderable.text/build-pipeline! v renderer)))))
+        (contains? m :vert-path)  (spock.renderable.triangle/build-pipeline! v renderer)
+        (contains? m :vbuf-atom)  (spock.renderable.polygon/build-pipeline! v renderer)
+        (contains? m :image-path) (spock.renderable.sprite/build-pipeline! v renderer)
+        (contains? m :font-path)  (spock.renderable.text/build-pipeline! v renderer)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Entity loading
@@ -86,7 +85,10 @@
 
 (defn- post-init-entity! [ent renderer]
   (doseq [[k v] (:components ent)]
-    (post-init-component! k v renderer)))
+    (try
+      (post-init-component! k v renderer)
+      (catch Exception e
+        (log/warn "post-init-entity! failed for entity" (:id ent) "component" k ":" (.getMessage e))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Script resolution
