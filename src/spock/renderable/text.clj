@@ -197,20 +197,24 @@
                                6 1 0 0)
                               (swap! cur-x + ndc-w)))))))))))
 
-        (cleanup! [_this device]
-          (when-let [dp @desc-pool-atom]
-            (VK10/vkDestroyDescriptorPool device (long dp) nil)
-            (reset! desc-pool-atom nil)
-            (reset! desc-set-atom nil))
-          (when-let [dl @desc-layout-atom]
-            (pipeline/destroy-descriptor-set-layout! device dl)
-            (reset! desc-layout-atom nil))
-          (when-let [tx @texture-atom]
-            (texture/destroy-texture! tx)
-            (reset! texture-atom nil))
-          (when-let [pl @pipeline-atom]
-            (pipeline/destroy! pl)
-            (reset! pipeline-atom nil))))
+          (cleanup! [_this device]
+                    (when-let [dp @desc-pool-atom]
+                      (VK10/vkDestroyDescriptorPool device (long dp) nil)
+                      (reset! desc-pool-atom nil)
+                      (reset! desc-set-atom nil))
+                    (when-let [dl @desc-layout-atom]
+                      (pipeline/destroy-descriptor-set-layout! device dl)
+                      (reset! desc-layout-atom nil))
+                    (when-let [tx @texture-atom]
+                      (texture/destroy-texture! tx)
+                      (reset! texture-atom nil))
+                    (when-let [vb @vbuf-atom]
+                      (VK10/vkDestroyBuffer device (long (:buffer vb)) nil)
+                      (VK10/vkFreeMemory device (long (:memory vb)) nil)
+                      (reset! vbuf-atom nil))
+                    (when-let [pl @pipeline-atom]
+                      (pipeline/destroy! pl)
+                      (reset! pipeline-atom nil)))))
 
       {:pipeline-atom    pipeline-atom
        :texture-atom     texture-atom
