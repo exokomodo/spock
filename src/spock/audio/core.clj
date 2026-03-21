@@ -36,6 +36,11 @@
 ;; init!
 ;; ---------------------------------------------------------------------------
 
+(defn initialized?
+  "Returns true if the OpenAL context has been initialized."
+  []
+  (not= -context (long 0)))
+
 (defn init!
   "Open the default OpenAL device, create a context, and make it current."
   []

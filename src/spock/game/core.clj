@@ -20,7 +20,8 @@
    [spock.renderer.vulkan :as vk]
    [spock.entity :as entity]
    [spock.input.core :as input]
-   [spock.audio.core :as audio])
+   [spock.audio.core :as audio]
+   [spock.settings :as settings])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -145,6 +146,7 @@
         (when (instance? Exception ready-val)
           (throw ready-val)))
       (audio/init!)
+      (audio/set-master-volume! (double (:master-volume @settings/settings 1.0)))
       (on-init! lifecycle)
       (swap! (:state game) assoc :running? true)
       (loop [last-t (System/nanoTime)]

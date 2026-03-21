@@ -34,9 +34,11 @@
     (reset! settings merged)
     ;; Apply logging config — require lazily to avoid circular dependency
     ((requiring-resolve 'spock.log/configure!) merged)
-    ;; Apply master volume — require lazily to avoid circular dependency
-    ((requiring-resolve 'spock.audio.core/set-master-volume!)
-     (double (:master-volume merged 1.0)))
+    ;; Apply master volume if audio is already initialized — require lazily to avoid circular dependency
+    (let [set-vol! (requiring-resolve 'spock.audio.core/set-master-volume!)
+          initialized? (requiring-resolve 'spock.audio.core/initialized?)]
+      (when (initialized?)
+        (set-vol! (double (:master-volume merged 1.0)))))
     merged))
 
 (defn merge-scene
