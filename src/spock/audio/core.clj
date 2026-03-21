@@ -42,21 +42,23 @@
   (not= @-context (long 0)))
 
 (defn init!
-  "Open the default OpenAL device, create a context, and make it current."
+  "Open the default OpenAL device, create a context, and make it current.
+   If no audio device is available (e.g. headless CI), logs a warning and
+   leaves audio in a disabled state — all subsequent audio calls are no-ops."
   []
   (let [dev (ALC10/nalcOpenDevice 0)]
-    (when (= dev MemoryUtil/NULL)
-      (throw (RuntimeException. "OpenAL: failed to open default device")))
-    (let [alc-caps (ALC/createCapabilities dev)
-          ctx      (ALC10/alcCreateContext dev (identity nil))]
-      (when (= ctx MemoryUtil/NULL)
-        (ALC10/alcCloseDevice dev)
-        (throw (RuntimeException. "OpenAL: failed to create context")))
-      (ALC10/alcMakeContextCurrent ctx)
-      (AL/createCapabilities alc-caps)
-      (reset! -device dev)
-      (reset! -context ctx)
-      (log/info "audio/init! device=" dev "context=" ctx))))
+    (if (= dev MemoryUtil/NULL)
+      (log/warn "audio/init!: no OpenAL device available — audio disabled")
+      (let [alc-caps (ALC/createCapabilities dev)
+            ctx      (ALC10/alcCreateContext dev (identity nil))]
+        (if (= ctx MemoryUtil/NULL)
+          (do (ALC10/alcCloseDevice dev)
+              (log/warn "audio/init!: failed to create OpenAL context — audio disabled"))
+          (do (ALC10/alcMakeContextCurrent ctx)
+              (AL/createCapabilities alc-caps)
+              (reset! -device dev)
+              (reset! -context ctx)
+              (log/info "audio/init! device=" dev "context=" ctx)))))))
 
 ;; ---------------------------------------------------------------------------
 ;; cleanup!
@@ -128,14 +130,16 @@
 
 (defn load-sound!
   "Load a WAV file and upload to an OpenAL buffer.
-   Returns the buffer id (long)."
+   Returns the buffer id (long), or 0 if audio is disabled."
   ^long [^String path]
-  (log/info "audio/load-sound!" path)
-  (let [buf-id (AL10/alGenBuffers)
-        {:keys [data format sample-rate]} (load-wav path)]
-    (AL10/alBufferData buf-id format ^ByteBuffer data (int sample-rate))
-    (swap! buffers conj (long buf-id))
-    (long buf-id)))
+  (if-not (initialized?)
+    (do (log/warn "audio/load-sound!: audio disabled, skipping" path) (long 0))
+    (do (log/info "audio/load-sound!" path)
+        (let [buf-id (AL10/alGenBuffers)
+              {:keys [data format sample-rate]} (load-wav path)]
+          (AL10/alBufferData buf-id format ^ByteBuffer data (int sample-rate))
+          (swap! buffers conj (long buf-id))
+          (long buf-id)))))
 
 ;; ---------------------------------------------------------------------------
 ;; play! / loop! / stop! / set-gain! / set-master-volume!
@@ -144,27 +148,31 @@
 (defn play!
   "Play a one-shot sound from buffer sound-id.
    Options: :gain (0.0–1.0, default 1.0).
-   The source is automatically cleaned up in tick! once it finishes."
+   The source is automatically cleaned up in tick! once it finishes.
+   No-ops if audio is disabled."
   [sound-id & {:keys [gain] :or {gain 1.0}}]
-  (let [src (long (AL10/alGenSources))]
-    (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
-    (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
-    (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_FALSE)
-    (AL10/alSourcePlay (int src))
-    (swap! sources assoc src :one-shot)
-    src))
+  (when (initialized?)
+    (let [src (long (AL10/alGenSources))]
+      (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
+      (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
+      (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_FALSE)
+      (AL10/alSourcePlay (int src))
+      (swap! sources assoc src :one-shot)
+      src)))
 
 (defn loop!
   "Play a looping sound from buffer sound-id. Returns source-id (long).
-   Options: :gain (0.0–1.0, default 1.0). Caller must call stop! to end looping."
+   Options: :gain (0.0–1.0, default 1.0). Caller must call stop! to end looping.
+   No-ops if audio is disabled."
   [sound-id & {:keys [gain] :or {gain 1.0}}]
-  (let [src (long (AL10/alGenSources))]
-    (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
-    (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
-    (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_TRUE)
-    (AL10/alSourcePlay (int src))
-    (swap! sources assoc src :loop)
-    (long src)))
+  (when (initialized?)
+    (let [src (long (AL10/alGenSources))]
+      (AL10/alSourcei (int src) AL10/AL_BUFFER  (int sound-id))
+      (AL10/alSourcef (int src) AL10/AL_GAIN    (float gain))
+      (AL10/alSourcei (int src) AL10/AL_LOOPING AL10/AL_TRUE)
+      (AL10/alSourcePlay (int src))
+      (swap! sources assoc src :loop)
+      (long src))))
 
 (defn stop!
   "Stop and delete a source."
@@ -182,9 +190,10 @@
   (AL10/alSourcef (int source-id) AL10/AL_GAIN (float gain)))
 
 (defn set-master-volume!
-  "Set the listener master volume (0.0–1.0)."
+  "Set the listener master volume (0.0–1.0). No-ops if audio is disabled."
   [^double volume]
-  (AL10/alListenerf AL10/AL_GAIN (float volume)))
+  (when (initialized?)
+    (AL10/alListenerf AL10/AL_GAIN (float volume))))
 
 ;; ---------------------------------------------------------------------------
 ;; tick!
