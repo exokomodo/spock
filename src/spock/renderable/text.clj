@@ -21,6 +21,7 @@
             [spock.renderer.core       :as renderer]
             [spock.texture             :as texture]
             [spock.font                :as font]
+            [spock.shader.builtins     :as builtins]
             [spock.log                 :as log])
   (:import [org.lwjgl.vulkan
             VK10
@@ -262,8 +263,8 @@
 
             ;; 5. Build pipeline with alpha blending
             (let [pl (-> (pipeline/builder device rp)
-                         (pipeline/vert-path "src/shaders/text.vert")
-                         (pipeline/frag-path "src/shaders/text.frag")
+                         (pipeline/vert-spv builtins/text-vert)
+                         (pipeline/frag-spv builtins/text-frag)
                          (pipeline/topology :triangle-list)
                          (pipeline/cull-mode :none)
                          (pipeline/descriptor-set-layout dl)

@@ -90,55 +90,18 @@ build/engine: ## Build the engine alone
 	$(LEIN) compile
 
 .PHONY: check
-check: check/format check/shaders ## Check code quality
+check: check/format ## Check code quality
 
 .PHONY: check/format
 check/format: ## Check code formatting with cljfmt
 	$(LEIN) cljfmt check
 
-.PHONY: check/shaders
-check/shaders: check/shaders/engine check/shaders/examples ## Check shader compilation
-
-.PHONY: check/shaders/engine
-check/shaders/engine: check/shaders/engine/polygon check/shaders/engine/sprite check/shaders/engine/text ## Build engine shaders
-
-.PHONY: check/shaders/engine/polygon
-check/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.vert
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/polygon.frag
-
-.PHONY: check/shaders/engine/sprite
-check/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite renderable)
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag
-
-.PHONY: check/shaders/engine/text
-check/shaders/engine/text: ## Compile the text shaders (used by :text renderable)
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.vert
-	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.frag
-
-.PHONY: check/shaders/examples
-check/shaders/examples: check/shaders/examples/hello ## Build example shaders
-
-.PHONY: check/shaders/examples/hello
-check/shaders/examples/hello: ## Compile the hello example shaders
-	set -v
-	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.vert
-	$(GLSLC) $(GLSLC_ARGS) examples/hello/shaders/triangle.frag
-
 .PHONY: clean
-clean: clean/clojure clean/shaders ## Clean the project
+clean: clean/clojure ## Clean the project
 
 .PHONY: clean/clojure
 clean/clojure: ## Clean Clojure build artifacts
 	$(LEIN) clean
-
-.PHONY: clean/shaders
-clean/shaders: ## Clean compiled shader files
-	find src examples -type f -name "*.spv" -delete
 
 .PHONY: deps
 deps: ## Install project dependencies
@@ -160,7 +123,7 @@ GEOMETRY ?= 0,0 1920x1080
 RECORD_EXAMPLE ?= hello
 
 .PHONY: screenrecord
-screenrecord: shaders/hello ## Record the hello window via cage + wf-recorder (OUTPUT=recording.mp4)
+screenrecord: ## Record the hello window via cage + wf-recorder (OUTPUT=recording.mp4)
 	$(if $(shell which cage 2>/dev/null),,$(error cage is required for screenrecord but was not found))
 	$(if $(shell which wf-recorder 2>/dev/null),,$(error wf-recorder is required for screenrecord but was not found))
 	echo "Recording to $(OUTPUT)…"

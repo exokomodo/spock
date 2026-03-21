@@ -1,0 +1,3 @@
+{:inputs  [{:name :frag-color :type :vec3 :location 0}]
+ :outputs [{:name :out-color  :type :vec4 :location 0}]
+ :main    [(set! out-color (vec4 frag-color 1.0))]}

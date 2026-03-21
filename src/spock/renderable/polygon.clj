@@ -17,6 +17,7 @@
             [spock.renderable.registry :as registry]
             [spock.pipeline.core       :as pipeline]
             [spock.renderer.core       :as renderer]
+            [spock.shader.builtins     :as builtins]
             [spock.log                 :as log])
   (:import [org.lwjgl.vulkan
             VK10
@@ -207,8 +208,8 @@
         floats (compute-vertices sides radius)
         vb     (create-vertex-buffer! dev pd floats)
         pl     (-> (pipeline/builder dev rp)
-                   (pipeline/vert-path "src/shaders/polygon.vert")
-                   (pipeline/frag-path "src/shaders/polygon.frag")
+                   (pipeline/vert-spv builtins/polygon-vert)
+                   (pipeline/frag-spv builtins/polygon-frag)
                    (pipeline/topology :triangle-fan)
                    (pipeline/cull-mode :none)
                    (pipeline/vertex-input 8 [{:location 0

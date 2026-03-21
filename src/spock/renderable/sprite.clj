@@ -19,6 +19,7 @@
             [spock.pipeline.core       :as pipeline]
             [spock.renderer.core       :as renderer]
             [spock.texture             :as texture]
+            [spock.shader.builtins     :as builtins]
             [spock.log                 :as log])
   (:import [org.lwjgl.vulkan
             VK10
@@ -238,8 +239,8 @@
 
             ;; 5. Build pipeline
             (let [pl (-> (pipeline/builder device rp)
-                         (pipeline/vert-path "src/shaders/sprite.vert")
-                         (pipeline/frag-path "src/shaders/sprite.frag")
+                         (pipeline/vert-spv builtins/sprite-vert)
+                         (pipeline/frag-spv builtins/sprite-frag)
                          (pipeline/topology :triangle-list)
                          (pipeline/cull-mode :none)
                          (pipeline/descriptor-set-layout dl)

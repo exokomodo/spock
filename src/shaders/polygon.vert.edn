@@ -1,0 +1,13 @@
+{:inputs  [{:name :in-pos :type :vec2 :location 0}]
+ :outputs [{:name :frag-color :type :vec4 :location 0}]
+ :push-constants [{:name :translation :type :vec2}
+                  {:name :rotation    :type :float}
+                  {:name :pad         :type :float}
+                  {:name :color       :type :vec4}]
+ :main [(let [^float c       (cos (.rotation pc))
+              ^float s       (sin (.rotation pc))
+              ^vec2  rotated (vec2 (- (* (.x in-pos) c) (* (.y in-pos) s))
+                                   (+ (* (.x in-pos) s) (* (.y in-pos) c)))
+              ^vec2  final   (+ rotated (.translation pc))]
+          (set! gl-Position (vec4 final 0.0 1.0))
+          (set! frag-color (.color pc)))]}
