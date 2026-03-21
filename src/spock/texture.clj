@@ -282,10 +282,10 @@
         pixel-buf (ByteBuffer/allocateDirect rgba-size)]
     (.order pixel-buf ByteOrder/LITTLE_ENDIAN)
     (doseq [px argb]
-      (.put pixel-buf (byte (bit-and (bit-shift-right px 16) 0xFF)))  ; R
-      (.put pixel-buf (byte (bit-and (bit-shift-right px 8) 0xFF)))   ; G
-      (.put pixel-buf (byte (bit-and px 0xFF)))                        ; B
-      (.put pixel-buf (byte (bit-and (bit-shift-right px 24) 0xFF)))) ; A
+      (.put pixel-buf (unchecked-byte (bit-and (bit-shift-right px 16) 0xFF)))  ; R
+      (.put pixel-buf (unchecked-byte (bit-and (bit-shift-right px 8) 0xFF)))   ; G
+      (.put pixel-buf (unchecked-byte (bit-and px 0xFF)))                        ; B
+      (.put pixel-buf (unchecked-byte (bit-and (bit-shift-right px 24) 0xFF)))) ; A
     (.flip pixel-buf)
 
     ;; 2. Create staging buffer and upload pixels
