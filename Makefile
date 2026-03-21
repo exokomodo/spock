@@ -41,8 +41,8 @@ ifeq ($(OS),Darwin)
   export JVM_OPTS := -Dorg.lwjgl.vulkan.libname=$(VULKAN_LOADER) $(JVM_OPTS)
 endif
 
-_GLSLC = $(shell which glslc)
-ifeq ($(_GLSLC),)
+GLSLC = $(shell which glslc)
+ifeq ($(GLSLC),)
   $(warning "glslc shader compiler not found in PATH. Please install it (e.g. via 'make setup/glslc') and ensure it's available in your PATH.")
 endif
 GLSLC_ARGS := -Werror
