@@ -17,8 +17,8 @@ Spiritual Clojure counterpart to [drakon](https://github.com/exokomodo/drakon).
 # Install dependencies
 make setup
 
-# Compile shaders + run the hello example
-make hello
+# Run the hello example
+make run/hello
 ```
 
 ## Structure
