@@ -42,7 +42,8 @@
    :descriptor-set-layout nil  ; pre-created VkDescriptorSetLayout handle (long), nil = none
    ;; vertex input: nil = no vertex buffers (hardcoded in shader)
    ;; non-nil: {:stride N :attributes [{:location L :format F :offset O} ...]}
-   :vertex-input          nil})
+   :vertex-input          nil
+   :alpha-blend           false})
 
 ;; ---------------------------------------------------------------------------
 ;; Option setters
@@ -70,6 +71,11 @@
   "Store a pre-created VkDescriptorSetLayout handle (long) in the pipeline cfg."
   [cfg layout-handle]
   (assoc cfg :descriptor-set-layout layout-handle))
+
+(defn alpha-blend
+  "Enable alpha blending (SRC_ALPHA / ONE_MINUS_SRC_ALPHA) in the pipeline."
+  [cfg]
+  (assoc cfg :alpha-blend true))
 
 (defn vert-path [cfg path]
   (when-not (shader/compile-glsl path)
@@ -101,7 +107,8 @@
 (defn build! [{:keys [^VkDevice device render-pass
                       vert-spv frag-spv
                       topology cull-mode front-face polygon-mode
-                      push-constant-size vertex-input descriptor-set-layout]}]
+                      push-constant-size vertex-input descriptor-set-layout
+                      alpha-blend]}]
   (when-not vert-spv (throw (RuntimeException. "No vertex shader")))
   (when-not frag-spv (throw (RuntimeException. "No fragment shader")))
 
@@ -193,7 +200,14 @@
                                              VK10/VK_COLOR_COMPONENT_B_BIT
                                              VK10/VK_COLOR_COMPONENT_A_BIT)]
                       (.colorWriteMask att color-mask)
-                      (.blendEnable att false)
+                      (.blendEnable att (boolean alpha-blend))
+                      (when alpha-blend
+                        (.srcColorBlendFactor att VK10/VK_BLEND_FACTOR_SRC_ALPHA)
+                        (.dstColorBlendFactor att VK10/VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA)
+                        (.colorBlendOp att VK10/VK_BLEND_OP_ADD)
+                        (.srcAlphaBlendFactor att VK10/VK_BLEND_FACTOR_ONE)
+                        (.dstAlphaBlendFactor att VK10/VK_BLEND_FACTOR_ZERO)
+                        (.alphaBlendOp att VK10/VK_BLEND_OP_ADD))
 
                       ;; wrap single att in a 1-element buffer via address
                       (let [att-buf (VkPipelineColorBlendAttachmentState/create (.address att) 1)]

@@ -92,7 +92,7 @@ build/engine: build/shaders/engine ## Build the engine alone
 build/shaders: build/shaders/engine build/shaders/examples ## Build all shaders
 
 .PHONY: build/shaders/engine
-build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite ## Build engine shaders
+build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite build/shaders/engine/text ## Build engine shaders
 
 .PHONY: build/shaders/engine/polygon
 build/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
@@ -105,6 +105,12 @@ build/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite rend
 	set -v
 	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
 	$(GLSLC) $(GLSLC_ARGS) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+
+.PHONY: build/shaders/engine/text
+build/shaders/engine/text: ## Compile the text shaders (used by :text renderable)
+	set -v
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.vert -o src/shaders/text.vert.spv
+	$(GLSLC) $(GLSLC_ARGS) src/shaders/text.frag -o src/shaders/text.frag.spv
 
 .PHONY: build/shaders/examples
 build/shaders/examples: build/shaders/examples/hello ## Build example shaders

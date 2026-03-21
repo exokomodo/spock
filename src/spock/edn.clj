@@ -30,6 +30,8 @@
             [spock.renderable.triangle]
             [spock.renderable.polygon]
             [spock.renderable.sprite]
+            [spock.renderable.text]
+            [spock.renderable.text]
             [spock.renderer.core   :as renderer]
             [spock.audio.core      :as audio]
             [spock.log             :as log]))
@@ -50,7 +52,9 @@
       (cond
         (contains? m :vert-path)    (spock.renderable.triangle/build-pipeline! v renderer)
         (contains? m :vbuf-atom)    (spock.renderable.polygon/build-pipeline! v renderer)
-        (contains? m :image-path)   (spock.renderable.sprite/build-pipeline! v renderer)))))
+        (contains? m :font-path)    (spock.renderable.text/build-pipeline! v renderer)
+        (contains? m :image-path)   (spock.renderable.sprite/build-pipeline! v renderer)
+        (contains? m :font-path)    (spock.renderable.text/build-pipeline! v renderer)))))
 
 ;; ---------------------------------------------------------------------------
 ;; Entity loading

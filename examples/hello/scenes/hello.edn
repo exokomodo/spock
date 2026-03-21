@@ -14,4 +14,10 @@
             {:id    :beep
              :audio {:file "examples/hello/assets/audio/beep.wav"
                      :loop false
-                     :gain 0.5}}]}
+                     :gain 0.5}}
+            {:id         :label
+             :renderable {:type  :text
+                          :font  "assets/fonts/mono.fnt"
+                          :text  "Hello Vulkan"
+                          :size  0.05
+                          :color [1.0 1.0 1.0 1.0]}}]}
