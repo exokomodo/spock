@@ -1,0 +1,6 @@
+{:inputs   [{:name :frag-uv    :type :vec2 :location 0}
+            {:name :frag-color :type :vec4 :location 1}]
+ :outputs  [{:name :out-color :type :vec4 :location 0}]
+ :uniforms [{:name :font-atlas :type :sampler2D :set 0 :binding 0}]
+ :main     [(let [^float alpha (.r (texture font-atlas frag-uv))]
+              (set! out-color (vec4 (.rgb frag-color) (* (.a frag-color) alpha))))]}

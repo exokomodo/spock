@@ -280,6 +280,27 @@
     (shader/load-spirv (str tmp-path ".spv"))))
 
 ;; ---------------------------------------------------------------------------
+;; load-edn — load a shader descriptor from a .edn file
+;; ---------------------------------------------------------------------------
+
+(defn load-edn
+  "Load a shader descriptor from a .edn file and compile it to SPIR-V.
+   The stage is inferred from the file extension (.vert → :vertex, .frag → :fragment).
+   Returns a SPIR-V ByteBuffer.
+
+   Example:
+     (dsl/load-edn \"src/shaders/polygon.vert.edn\")"
+  [path]
+  (let [descriptor (clojure.edn/read-string (slurp (clojure.java.io/file path)))
+        stage (cond
+                (.contains ^String path ".vert") :vertex
+                (.contains ^String path ".frag") :fragment
+                (.contains ^String path ".comp") :compute
+                :else (throw (ex-info (str "Cannot infer shader stage from path: " path)
+                                      {:path path})))]
+    (compile-shader (assoc descriptor :stage stage))))
+
+;; ---------------------------------------------------------------------------
 ;; defshader macro
 ;; ---------------------------------------------------------------------------
 

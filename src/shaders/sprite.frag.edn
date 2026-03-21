@@ -1,0 +1,5 @@
+{:inputs   [{:name :frag-uv    :type :vec2 :location 0}
+            {:name :frag-color :type :vec4 :location 1}]
+ :outputs  [{:name :out-color :type :vec4 :location 0}]
+ :uniforms [{:name :tex-sampler :type :sampler2D :set 0 :binding 0}]
+ :main     [(set! out-color (* (texture tex-sampler frag-uv) frag-color))]}

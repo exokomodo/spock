@@ -1,0 +1,15 @@
+{:outputs [{:name :frag-uv    :type :vec2 :location 0}
+           {:name :frag-color :type :vec4 :location 1}]
+ :push-constants [{:name :pos      :type :vec2}
+                  {:name :size     :type :vec2}
+                  {:name :uv-pos   :type :vec2}
+                  {:name :uv-size  :type :vec2}
+                  {:name :color    :type :vec4}]
+ :const-arrays
+ [{:name :offsets :type :vec2 :size 6
+   :values [(vec2 0.0 0.0) (vec2 1.0 0.0) (vec2 1.0 1.0)
+            (vec2 0.0 0.0) (vec2 1.0 1.0) (vec2 0.0 1.0)]}]
+ :main [(let [^vec2 off (aget offsets gl-VertexIndex)]
+          (set! gl-Position (vec4 (+ (.pos pc) (* off (.size pc))) 0.0 1.0))
+          (set! frag-uv (+ (.uv-pos pc) (* off (.uv-size pc))))
+          (set! frag-color (.color pc)))]}
