@@ -41,6 +41,8 @@ ifeq ($(OS),Darwin)
   export JVM_OPTS := -Dorg.lwjgl.vulkan.libname=$(VULKAN_LOADER) $(JVM_OPTS)
 endif
 
+GLSLC := glslc -Werror
+
 ##@ Setup environment
 
 .PHONY: setup
@@ -66,31 +68,43 @@ endif
 
 ##@ Development tools
 .PHONY: build
-build: build/shaders ## Build the project
-	lein compile
+build: build/engine ## Build the engine
 
 .PHONY: build/all
-build/all: build/shaders ## Compile examples
+build/all: build/engine ## Compile everything (including examples)
 	lein with-profile hello compile
 	lein with-profile spin-shooter compile
 
+.PHONY: build/engine
+build/engine: build/shaders/engine ## Build the engine alone
+	lein compile
+
 .PHONY: build/shaders
-build/shaders: build/shaders/polygon build/shaders/sprite build/shaders/hello ## Build engine shaders
+build/shaders: build/shaders/engine build/shaders/examples ## Build all shaders
 
-.PHONY: build/shaders/hello
-build/shaders/hello:
-	glslc examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
-	glslc examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
+.PHONY: build/shaders/engine
+build/shaders/engine: build/shaders/engine/polygon build/shaders/engine/sprite ## Build engine shaders
 
-.PHONY: build/shaders/polygon
-build/shaders/polygon: ## Compile the polygon shaders (used by :polygon renderable)
-	glslc src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
-	glslc src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
+.PHONY: build/shaders/engine/polygon
+build/shaders/engine/polygon: ## Compile the polygon shaders (used by :polygon renderable)
+	set -v
+	$(GLSLC) src/shaders/polygon.vert -o src/shaders/polygon.vert.spv
+	$(GLSLC) src/shaders/polygon.frag -o src/shaders/polygon.frag.spv
 
-.PHONY: build/shaders/sprite
-build/shaders/sprite: ## Compile the sprite shaders (used by :sprite renderable)
-	glslc src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
-	glslc src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+.PHONY: build/shaders/engine/sprite
+build/shaders/engine/sprite: ## Compile the sprite shaders (used by :sprite renderable)
+	set -v
+	$(GLSLC) src/shaders/sprite.vert -o src/shaders/sprite.vert.spv
+	$(GLSLC) src/shaders/sprite.frag -o src/shaders/sprite.frag.spv
+
+.PHONY: build/shaders/examples
+build/shaders/examples: build/shaders/examples/hello ## Build example shaders
+
+.PHONY: build/shaders/examples/hello
+build/shaders/examples/hello: ## Compile the hello example shaders
+	set -v
+	$(GLSLC) examples/hello/shaders/triangle.vert -o examples/hello/shaders/triangle.vert.spv
+	$(GLSLC) examples/hello/shaders/triangle.frag -o examples/hello/shaders/triangle.frag.spv
 
 .PHONY: check
 check: check/format ## Check code quality
