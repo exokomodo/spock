@@ -7,7 +7,7 @@
                                     :frag "examples/hello/shaders/triangle.frag"}}}
             {:id         :logo
              :renderable {:type   :sprite
-                          :image  "assets/images/hello.png"
+                          :image  "examples/hello/assets/images/hello.png"
                           :color  [1.0 1.0 1.0 1.0]
                           :width  0.4
                           :height 0.4}}]}
