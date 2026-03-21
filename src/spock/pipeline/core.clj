@@ -22,24 +22,27 @@
             VkPipelineColorBlendAttachmentState
             VkPipelineLayoutCreateInfo
             VkPushConstantRange
-            VkShaderModuleCreateInfo]))
+            VkShaderModuleCreateInfo
+            VkDescriptorSetLayoutCreateInfo
+            VkDescriptorSetLayoutBinding]))
 
 ;; ---------------------------------------------------------------------------
 ;; Builder constructor
 ;; ---------------------------------------------------------------------------
 (defn builder [^VkDevice device render-pass]
-  {:device             device
-   :render-pass        render-pass
-   :vert-spv           nil
-   :frag-spv           nil
-   :topology           VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
-   :cull-mode          VK10/VK_CULL_MODE_NONE
-   :front-face         VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE
-   :polygon-mode       VK10/VK_POLYGON_MODE_FILL
-   :push-constant-size nil  ; bytes, nil = no push constants
+  {:device                device
+   :render-pass           render-pass
+   :vert-spv              nil
+   :frag-spv              nil
+   :topology              VK10/VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+   :cull-mode             VK10/VK_CULL_MODE_NONE
+   :front-face            VK10/VK_FRONT_FACE_COUNTER_CLOCKWISE
+   :polygon-mode          VK10/VK_POLYGON_MODE_FILL
+   :push-constant-size    nil  ; bytes, nil = no push constants
+   :descriptor-set-layout nil  ; pre-created VkDescriptorSetLayout handle (long), nil = none
    ;; vertex input: nil = no vertex buffers (hardcoded in shader)
    ;; non-nil: {:stride N :attributes [{:location L :format F :offset O} ...]}
-   :vertex-input       nil})
+   :vertex-input          nil})
 
 ;; ---------------------------------------------------------------------------
 ;; Option setters
@@ -62,6 +65,11 @@
    attributes — vector of {:location int :format VkFormat-int :offset int}."
   [cfg stride attributes]
   (assoc cfg :vertex-input {:stride stride :attributes attributes}))
+
+(defn descriptor-set-layout
+  "Store a pre-created VkDescriptorSetLayout handle (long) in the pipeline cfg."
+  [cfg layout-handle]
+  (assoc cfg :descriptor-set-layout layout-handle))
 
 (defn vert-path [cfg path]
   (when-not (shader/compile-glsl path)
@@ -93,7 +101,7 @@
 (defn build! [{:keys [^VkDevice device render-pass
                       vert-spv frag-spv
                       topology cull-mode front-face polygon-mode
-                      push-constant-size vertex-input]}]
+                      push-constant-size vertex-input descriptor-set-layout]}]
   (when-not vert-spv (throw (RuntimeException. "No vertex shader")))
   (when-not frag-spv (throw (RuntimeException. "No fragment shader")))
 
@@ -201,11 +209,18 @@
                           ;; ---- pipeline layout ----
                           (let [layout-ci (VkPipelineLayoutCreateInfo/calloc stack)]
                             (.sType layout-ci VK10/VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO)
+                            ;; Optional descriptor set layout
+                            (when descriptor-set-layout
+                              (let [lbuf (doto (.mallocLong stack 1)
+                                           (.put (long descriptor-set-layout))
+                                           (.flip))]
+                                (.pSetLayouts layout-ci lbuf)))
                             ;; Optional push constant range
                             (when push-constant-size
                               (let [pcr (VkPushConstantRange/calloc 1 ^MemoryStack stack)
                                     r0  (.get pcr 0)]
-                                (.stageFlags r0 VK10/VK_SHADER_STAGE_VERTEX_BIT)
+                                (.stageFlags r0 (bit-or VK10/VK_SHADER_STAGE_VERTEX_BIT
+                                                        VK10/VK_SHADER_STAGE_FRAGMENT_BIT))
                                 (.offset     r0 0)
                                 (.size       r0 (int push-constant-size))
                                 (.pPushConstantRanges layout-ci pcr)))
@@ -271,3 +286,35 @@
   (when (and device pipeline layout)
     (VK10/vkDestroyPipeline       device (long pipeline) nil)
     (VK10/vkDestroyPipelineLayout device (long layout)   nil)))
+
+;; ---------------------------------------------------------------------------
+;; Descriptor set layout helpers
+;; ---------------------------------------------------------------------------
+
+(defn create-combined-image-sampler-layout!
+  "Create a VkDescriptorSetLayout with a single combined image sampler binding
+   at binding 0, fragment stage. Returns the layout handle (long)."
+  [^VkDevice device]
+  (let [stack (MemoryStack/stackPush)]
+    (try
+      (let [binding (doto (.get (VkDescriptorSetLayoutBinding/calloc 1 stack) 0)
+                      (.binding 0)
+                      (.descriptorType VK10/VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                      (.descriptorCount 1)
+                      (.stageFlags VK10/VK_SHADER_STAGE_FRAGMENT_BIT))
+            bindings (VkDescriptorSetLayoutBinding/create (.address binding) 1)
+            ci       (doto (VkDescriptorSetLayoutCreateInfo/calloc stack)
+                       (.sType VK10/VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO)
+                       (.pBindings bindings))
+            lp       (.mallocLong stack 1)
+            r        (VK10/vkCreateDescriptorSetLayout device ci nil lp)]
+        (when (not= r VK10/VK_SUCCESS)
+          (throw (RuntimeException. (str "vkCreateDescriptorSetLayout failed: " r))))
+        (.get lp 0))
+      (finally
+        (MemoryStack/stackPop)))))
+
+(defn destroy-descriptor-set-layout!
+  "Destroy a VkDescriptorSetLayout."
+  [^VkDevice device layout-handle]
+  (VK10/vkDestroyDescriptorSetLayout device (long layout-handle) nil))
