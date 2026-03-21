@@ -151,6 +151,10 @@ run/hello: ## Run the hello example
 run/spin-shooter: ## Run the spin-shooter example
 	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) spin-shooter
 
+.PHONY: run/teapot
+run/teapot: ## Run the Utah Teapot 3D example
+	$(DISPLAY_PREFIX) $(LEIN) $(LEIN_RUN_ARGS) teapot
+
 ##@ Utilities
 
 .PHONY: help
