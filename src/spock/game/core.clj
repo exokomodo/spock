@@ -15,12 +15,12 @@
    - stop?     volatile! — set true by main thread when window closes;
                            checked every frame by render thread
    - error-p   promise — render thread delivers any frame-loop exception here"
-  (:require [spock.audio :as audio]
-            [spock.renderer.core :as renderer]
-            [spock.renderer.vulkan :as vk]
-            [spock.entity :as entity]
-            [spock.input.core :as input]
-            [spock.audio.core :as audio])
+  (:require
+   [spock.renderer.core :as renderer]
+   [spock.renderer.vulkan :as vk]
+   [spock.entity :as entity]
+   [spock.input.core :as input]
+   [spock.audio.core :as audio])
   (:import [org.lwjgl.glfw GLFW Callbacks]
            [org.lwjgl.system MemoryUtil]))
 
@@ -140,7 +140,6 @@
                   "spock-render")]
     (try
       (renderer/create-surface! r window)
-      (audio/init!)
       (.start render-t)
       (let [ready-val @ready-p]
         (when (instance? Exception ready-val)
