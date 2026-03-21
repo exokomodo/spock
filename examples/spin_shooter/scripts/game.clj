@@ -144,7 +144,7 @@
     (when (or (input/key-pressed? :space)
               (input/mouse-pressed? 0))
       (when-let [snd (:sound/shoot @state)]
-        (audio/play! snd))
+        (audio/play! snd :gain 0.5))
       (swap! state
              (fn [s]
                (let [new-bullets
@@ -227,11 +227,11 @@
                                       (swap! score-gain inc))))
 
                    bullets-final (vec (keep-indexed
-                                        (fn [i b] (when-not (contains? @hit-bullets i) b))
-                                        bullets'))
+                                       (fn [i b] (when-not (contains? @hit-bullets i) b))
+                                       bullets'))
                    enemies-final (vec (keep-indexed
-                                        (fn [i e] (when-not (contains? @hit-enemies i) e))
-                                        enemies-moved))
+                                       (fn [i e] (when-not (contains? @hit-enemies i) e))
+                                       enemies-moved))
 
                    ;; Check if any enemy reached planet center
                    planet-hit?  (some (fn [e]
