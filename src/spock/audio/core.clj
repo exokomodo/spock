@@ -23,8 +23,8 @@
 ;; ---------------------------------------------------------------------------
 
 ;; Device and context handles (long)
-(def ^:private ^:volatile-mutable -device  (long 0))
-(def ^:private ^:volatile-mutable -context (long 0))
+(defonce ^:private -device  (atom (long 0)))
+(defonce ^:private -context (atom (long 0)))
 
 ;; Set of loaded buffer ids (ints stored as longs)
 (def ^:private buffers (atom #{}))
@@ -39,7 +39,7 @@
 (defn initialized?
   "Returns true if the OpenAL context has been initialized."
   []
-  (not= -context (long 0)))
+  (not= @-context (long 0)))
 
 (defn init!
   "Open the default OpenAL device, create a context, and make it current."
@@ -54,8 +54,8 @@
         (throw (RuntimeException. "OpenAL: failed to create context")))
       (ALC10/alcMakeContextCurrent ctx)
       (AL/createCapabilities alc-caps)
-      (set! -device  dev)
-      (set! -context ctx)
+      (reset! -device dev)
+      (reset! -context ctx)
       (log/info "audio/init! device=" dev "context=" ctx))))
 
 ;; ---------------------------------------------------------------------------
@@ -82,13 +82,13 @@
         (log/warn "audio/cleanup! buffer error:" (.getMessage e)))))
   (reset! buffers #{})
   ;; Destroy context and device
-  (when (not= -context (long 0))
+  (when (not= @-context (long 0))
     (ALC10/alcMakeContextCurrent (long 0))
-    (ALC10/alcDestroyContext -context)
-    (set! -context (long 0)))
-  (when (not= -device (long 0))
-    (ALC10/alcCloseDevice -device)
-    (set! -device (long 0))))
+    (ALC10/alcDestroyContext @-context)
+    (reset! -context (long 0)))
+  (when (not= @-device (long 0))
+    (ALC10/alcCloseDevice @-device)
+    (reset! -device (long 0))))
 
 ;; ---------------------------------------------------------------------------
 ;; WAV loading via javax.sound.sampled
