@@ -1,6 +1,6 @@
 (ns spock.pipeline.core
   "Data-driven Vulkan graphics pipeline builder."
-  (:require [spock.shader.core :as shader]
+  (:require [warpaint.compiler :as shader]
             [spock.log :as log])
   (:import [org.lwjgl.system MemoryStack]
            [org.lwjgl.vulkan

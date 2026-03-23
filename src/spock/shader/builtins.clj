@@ -2,10 +2,10 @@
   "Pre-compiled built-in shaders for spock renderables.
 
    Shaders are defined as EDN descriptor maps in src/shaders/*.edn and compiled
-   to SPIR-V ByteBuffers at namespace load time via spock.shader.dsl/load-edn.
+   to SPIR-V ByteBuffers at namespace load time via warpaint.dsl/load-edn.
 
    Use with (pipeline/vert-spv cfg polygon-vert) instead of (pipeline/vert-path ...)."
-  (:require [spock.shader.dsl :as dsl]))
+  (:require [warpaint.dsl :as dsl]))
 
 ;; ---------------------------------------------------------------------------
 ;; Triangle shaders (hardcoded RGB triangle — default for :triangle renderable)
