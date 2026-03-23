@@ -172,10 +172,10 @@
                      command-buffer (long layout)
                      (bit-or VK10/VK_SHADER_STAGE_VERTEX_BIT
                              VK10/VK_SHADER_STAGE_FRAGMENT_BIT)
-                     pc-buf))
-                  (VK10/vkCmdDrawIndexed
-                   ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
-                   (int ic) 1 0 0 0))))))
+                     pc-buf)
+                    (VK10/vkCmdDrawIndexed
+                     ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
+                     (int ic) 1 0 0 0)))))))
 
         (cleanup! [_this device]
           (when-let [pl @pipeline-atom]
@@ -230,6 +230,7 @@
                  (pipeline/frag-path "src/shaders/mesh.frag")
                  (pipeline/topology :triangle-list)
                  (pipeline/cull-mode :back)
+                 (pipeline/front-face :clockwise)
                  (pipeline/depth-test)
                  (pipeline/vertex-input vertex-stride
                                         [{:location 0 :format vk-fmt-rgb32f :offset 0}
