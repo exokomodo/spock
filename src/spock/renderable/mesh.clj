@@ -211,17 +211,17 @@
               "indices=" (:index-count mesh))
     ;; Upload vertex buffer
     (let [vdata (let [fa (:vertices mesh)
-                      bb (ByteBuffer/allocateDirect (* (alength fa) 4))]
+                      bb (java.nio.ByteBuffer/allocate (* (alength fa) 4))]
                   (.order bb ByteOrder/LITTLE_ENDIAN)
                   (doseq [f fa] (.putFloat bb (float f)))
-                  (.array (.rewind bb)))]
+                  (.array bb))]
       (reset! vbuf-atom (upload-buffer! device pd vdata VK10/VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)))
     ;; Upload index buffer
     (let [idata (let [ia (:indices mesh)
-                      bb (ByteBuffer/allocateDirect (* (alength ia) 4))]
+                      bb (java.nio.ByteBuffer/allocate (* (alength ia) 4))]
                   (.order bb ByteOrder/LITTLE_ENDIAN)
                   (doseq [i ia] (.putInt bb (int i)))
-                  (.array (.rewind bb)))]
+                  (.array bb))]
       (reset! ibuf-atom (upload-buffer! device pd idata VK10/VK_BUFFER_USAGE_INDEX_BUFFER_BIT)))
     (reset! index-count (:index-count mesh))
     ;; Build pipeline
