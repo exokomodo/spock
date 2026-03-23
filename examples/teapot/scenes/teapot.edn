@@ -1,0 +1,7 @@
+{:title  "Utah Teapot"
+ :script teapot.scripts.teapot
+
+ :entities [{:id         :teapot
+             :renderable {:type  :mesh
+                          :file  "examples/teapot/teapot.obj"
+                          :color [0.8 0.6 0.3 1.0]}}]}
