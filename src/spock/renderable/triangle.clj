@@ -26,7 +26,7 @@
             [spock.pipeline.core       :as pipeline]
             [spock.renderer.core       :as renderer]
             [spock.shader.builtins     :as builtins]
-            [spock.shader.dsl          :as dsl]
+            [warpaint.dsl              :as dsl]
             [spock.log                 :as log])
   (:import [org.lwjgl.vulkan VK10]))
 
@@ -37,9 +37,9 @@
   [stage descriptor-or-path]
   (cond
     (string? descriptor-or-path)
-    (do (require 'spock.shader.core)
-        (let [compile-fn (requiring-resolve 'spock.shader.core/compile-glsl)
-              load-fn    (requiring-resolve 'spock.shader.core/load-spirv)]
+    (do (require 'warpaint.compiler)
+        (let [compile-fn (requiring-resolve 'warpaint.compiler/compile-glsl)
+              load-fn    (requiring-resolve 'warpaint.compiler/load-spirv)]
           (compile-fn descriptor-or-path)
           (load-fn (str descriptor-or-path ".spv"))))
     (map? descriptor-or-path)
