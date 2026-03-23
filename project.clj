@@ -57,7 +57,7 @@
                                (conj "-XstartOnFirstThread"
                                      (str "-Dorg.lwjgl.vulkan.libname="
                                           (or (System/getenv "VULKAN_LOADER")
-                                              "/usr/local/lib/libvulkan.1.dylib")))))
+                                              "/usr/local/lib/libvulkan.1.dylib")))))}
    :teapot {:main spock.main
             :aot [spock.main]
             :source-paths ["src" "examples" "examples/teapot/scripts"]
