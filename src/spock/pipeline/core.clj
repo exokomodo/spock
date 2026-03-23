@@ -19,6 +19,7 @@
             VkPipelineRasterizationStateCreateInfo
             VkPipelineMultisampleStateCreateInfo
             VkPipelineColorBlendStateCreateInfo
+            VkPipelineDepthStencilStateCreateInfo
             VkPipelineColorBlendAttachmentState
             VkPipelineLayoutCreateInfo
             VkPushConstantRange
@@ -43,7 +44,8 @@
    ;; vertex input: nil = no vertex buffers (hardcoded in shader)
    ;; non-nil: {:stride N :attributes [{:location L :format F :offset O} ...]}
    :vertex-input          nil
-   :alpha-blend           false})
+   :alpha-blend           false
+   :depth-test            false})
 
 ;; ---------------------------------------------------------------------------
 ;; Option setters
@@ -71,6 +73,11 @@
   "Store a pre-created VkDescriptorSetLayout handle (long) in the pipeline cfg."
   [cfg layout-handle]
   (assoc cfg :descriptor-set-layout layout-handle))
+
+(defn depth-test
+  "Enable depth testing and depth writes (VK_COMPARE_OP_LESS)."
+  [cfg]
+  (assoc cfg :depth-test true))
 
 (defn alpha-blend
   "Enable alpha blending (SRC_ALPHA / ONE_MINUS_SRC_ALPHA) in the pipeline."
@@ -108,7 +115,7 @@
                       vert-spv frag-spv
                       topology cull-mode front-face polygon-mode
                       push-constant-size vertex-input descriptor-set-layout
-                      alpha-blend]}]
+                      alpha-blend depth-test]}]
   (when-not vert-spv (throw (RuntimeException. "No vertex shader")))
   (when-not frag-spv (throw (RuntimeException. "No fragment shader")))
 
@@ -254,7 +261,15 @@
                                 (.pViewportState pci vps)
                                 (.pRasterizationState pci rast)
                                 (.pMultisampleState pci ms)
-                                (.pDepthStencilState pci nil)
+                                (.pDepthStencilState pci
+                                                     (when depth-test
+                                                       (doto (VkPipelineDepthStencilStateCreateInfo/calloc stack)
+                                                         (.sType VK10/VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO)
+                                                         (.depthTestEnable true)
+                                                         (.depthWriteEnable true)
+                                                         (.depthCompareOp VK10/VK_COMPARE_OP_LESS)
+                                                         (.depthBoundsTestEnable false)
+                                                         (.stencilTestEnable false))))
                                 (.pColorBlendState pci cb)
                                 (.pDynamicState pci dyn)
                                 (.layout pci layout)
