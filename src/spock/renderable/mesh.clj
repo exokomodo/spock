@@ -238,7 +238,7 @@
         _ (spock.log/log-with-context! "mesh/build-pipeline! loading OBJ:" obj-path)
         mesh (obj/load-obj obj-path)]
     (spock.log/log-with-context! "mesh/build-pipeline! loaded" obj-path
-              "verts=" (:vertex-count mesh) "indices=" (:index-count mesh))
+                                 "verts=" (:vertex-count mesh) "indices=" (:index-count mesh))
 
     (spock.log/log-with-context! "mesh/build-pipeline! uploading vertex buffer...")
     (reset! vbuf-atom
