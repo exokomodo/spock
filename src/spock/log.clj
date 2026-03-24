@@ -1,8 +1,7 @@
 (ns spock.log
   "Logging utilities.")
 
-(require '[clojure.tools.logging :as log]
-         '[clojure.java.io :as io])
+(require '[clojure.tools.logging :as log])
 
 (defmacro debug
   "Augments `log/debug` with automatic file and line context."

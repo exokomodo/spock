@@ -264,7 +264,7 @@
    Returns {:image long :image-view long :sampler long :memory long
             :width int :height int :device VkDevice}."
   [renderer path]
-  (log/log "texture/load-texture! path=" path)
+  (log/info "texture/load-texture! path=" path)
   (let [state           (:state renderer)
         ^org.lwjgl.vulkan.VkDevice device  (:device @state)
         ^org.lwjgl.vulkan.VkPhysicalDevice pd (:physical-device @state)
@@ -426,8 +426,8 @@
           (VK10/vkDestroyBuffer device (long (:buffer staging)) nil)
           (VK10/vkFreeMemory device (long (:memory staging)) nil)
 
-          (log/log "texture/load-texture! OK image=" image-handle
-                   "view=" image-view "sampler=" sampler)
+          (log/info "texture/load-texture! OK image=" image-handle
+                    "view=" image-view "sampler=" sampler)
           {:image      image-handle
            :image-view image-view
            :sampler    sampler

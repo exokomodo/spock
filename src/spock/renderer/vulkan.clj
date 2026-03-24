@@ -480,7 +480,7 @@
 ;; ---------------------------------------------------------------------------
 (defn- record-command-buffer! [state ^VkCommandBuffer cb ^long img-idx renderables]
   (require 'spock.log)
-  ((resolve 'spock.log/trace) "record-command-buffer! renderables=" (count renderables) "img=" img-idx)
+  ((resolve 'spock.log/debug) "record-command-buffer! renderables=" (count renderables) "img=" img-idx)
   (let [^MemoryStack stack (MemoryStack/stackPush)
         ^VkDevice dev (:device @state)
         rp   (long (:render-pass @state))

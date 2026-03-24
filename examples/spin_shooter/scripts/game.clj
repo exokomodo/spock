@@ -93,7 +93,7 @@
 ;; ---------------------------------------------------------------------------
 
 (defn on-init [game sc shared-state]
-  (log/log "spin-shooter game on-init")
+  (log/info "spin-shooter game on-init")
   ;; Load sound assets
   (let [base-dir "examples/spin_shooter/assets/audio"
         shoot-id (try (audio/load-sound! (str base-dir "/shoot.wav"))
@@ -324,4 +324,4 @@
 ;; ---------------------------------------------------------------------------
 
 (defn on-done [game sc shared-state]
-  (log/log "spin-shooter game on-done score=" (:score @state)))
+  (log/info "spin-shooter game on-done score=" (:score @state)))
