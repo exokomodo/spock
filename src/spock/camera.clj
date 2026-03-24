@@ -44,9 +44,9 @@
         ty (- (dot u position))
         tz    (dot f position)
         m  (float-array 16)]
-    (aset m 0  (float rx)) (aset m 1  (float ry)) (aset m 2  (float rz)) (aset m 3  0.0)
-    (aset m 4  (float ux)) (aset m 5  (float uy)) (aset m 6  (float uz)) (aset m 7  0.0)
-    (aset m 8  (float (- fx))) (aset m 9  (float (- fy))) (aset m 10 (float (- fz))) (aset m 11 0.0)
+    (aset m 0  (float rx)) (aset m 1  (float ux)) (aset m 2  (float (- fx))) (aset m 3  0.0)
+    (aset m 4  (float ry)) (aset m 5  (float uy)) (aset m 6  (float (- fy))) (aset m 7  0.0)
+    (aset m 8  (float rz)) (aset m 9  (float uz)) (aset m 10 (float (- fz))) (aset m 11 0.0)
     (aset m 12 (float tx)) (aset m 13 (float ty)) (aset m 14 (float tz)) (aset m 15 1.0)
     m))
 
