@@ -12,7 +12,7 @@
                             :elapsed 0.0}))
 
 (defn on-init [game scene shared-state]
-  (log/log "hello.scripts.hello/on-init")
+  (log/info "hello.scripts.hello/on-init")
   ;; Play the beep once on scene start
   (when-let [beep (->> (scene/get-entities scene)
                        (filter #(= (:id %) :beep))
@@ -41,4 +41,4 @@
         (GLFW/glfwSetWindowShouldClose window true)))))
 
 (defn on-done [game scene shared-state]
-  (log/log "hello.scripts.hello/on-done"))
+  (log/info "hello.scripts.hello/on-done"))

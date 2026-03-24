@@ -285,7 +285,7 @@
                                     (VK10/vkDestroyPipelineLayout device layout nil)
                                     (throw (RuntimeException. (str "vkCreateGraphicsPipelines failed: " r))))
                                   (let [pipeline (.get lp 0)]
-                                    (log/log "pipeline/build! OK pipeline=" pipeline "layout=" layout)
+                                    (log/info "pipeline/build! OK pipeline=" pipeline "layout=" layout)
                                     {:pipeline pipeline
                                      :layout   layout
                                      :device   device})))))))))))))))

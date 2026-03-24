@@ -244,7 +244,7 @@
     ;; 1. Parse font
     (let [fnt (font/load! font-path)]
       (reset! font-atom fnt)
-      (log/log "text/build-pipeline! glyphs=" (count (:glyphs fnt)))
+      (log/info "text/build-pipeline! glyphs=" (count (:glyphs fnt)))
 
       ;; 2. Load atlas texture
       (let [tx (texture/load-texture! renderer (:atlas-path fnt))]

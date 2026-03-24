@@ -64,7 +64,7 @@
                 (VK10/vkCmdDraw
                  ^org.lwjgl.vulkan.VkCommandBuffer command-buffer
                  3 1 0 0))
-              (log/trace ":triangle draw: no pipeline yet"))))
+              (log/warn ":triangle draw: no pipeline yet"))))
         (cleanup! [_this _device]
           (pipeline/destroy! @pipeline-atom)
           (reset! pipeline-atom {})))
