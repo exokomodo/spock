@@ -261,8 +261,7 @@
                  (pipeline/vert-spv vert-spv)
                  (pipeline/frag-spv frag-spv)
                  (pipeline/topology :triangle-list)
-                 (pipeline/cull-mode :back)
-                 (pipeline/front-face :clockwise)
+                 (pipeline/cull-mode :none)
                  (pipeline/depth-test)
                  (pipeline/vertex-input vertex-stride
                                         [{:location 0 :format vk-fmt-rgb32f :offset 0}
