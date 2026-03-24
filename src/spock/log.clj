@@ -63,18 +63,33 @@
       (send writer-agent do-write line))))
 
 ;; ---------------------------------------------------------------------------
-;; Public API
+;; Public API  (macros — capture call-site file + line)
 ;; ---------------------------------------------------------------------------
 
-(defn error [& args] (apply write! :error args))
-(defn warn  [& args] (apply write! :warn  args))
-(defn info  [& args] (apply write! :info  args))
-(defn debug [& args] (apply write! :debug args))
-(defn trace [& args] (apply write! :trace args))
+(defmacro error [& args]
+  (let [prefix (str *file* ":" (:line (meta &form)))]
+    `(write! :error ~prefix ~@args)))
 
-(defn log
+(defmacro warn [& args]
+  (let [prefix (str *file* ":" (:line (meta &form)))]
+    `(write! :warn ~prefix ~@args)))
+
+(defmacro info [& args]
+  (let [prefix (str *file* ":" (:line (meta &form)))]
+    `(write! :info ~prefix ~@args)))
+
+(defmacro debug [& args]
+  (let [prefix (str *file* ":" (:line (meta &form)))]
+    `(write! :debug ~prefix ~@args)))
+
+(defmacro trace [& args]
+  (let [prefix (str *file* ":" (:line (meta &form)))]
+    `(write! :trace ~prefix ~@args)))
+
+(defmacro log
   "Backward-compatible alias — logs at :debug level.
    Existing engine/game calls to (log/log ...) are unchanged but are
    now silenced at the default :info level."
   [& args]
-  (apply write! :debug args))
+  (let [prefix (str *file* ":" (:line (meta &form)))]
+    `(write! :debug ~prefix ~@args)))
