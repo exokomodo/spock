@@ -114,6 +114,9 @@ fix: fix/format ## Fix code issues
 fix/format: ## Fix code formatting
 	$(LEIN) cljfmt fix
 
+.PHONY: format
+format: fix/format ## Format code with cljfmt
+
 # screenrecord — capture the cage window to a file.
 # Requires cage and wf-recorder (wlroots-based screen capture for cage's Wayland compositor).
 # Requires LIBSEAT_BACKEND=seatd (seatd must be running) for headless/SSH use.
