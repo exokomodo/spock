@@ -6,22 +6,22 @@
 (defmacro debug
   "Augments `log/debug` with automatic file and line context."
   [& msg]
-  `(log/debug ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+  `(log/debug ~@(list* (str *file* ":" (:line (meta &form)) " - ") msg)))
 
 (defmacro info
   "Augments `log/info` with automatic file and line context."
   [& msg]
-  `(log/info ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+  `(log/info ~@(list* (str *file* ":" (:line (meta &form)) " - ") msg)))
 
 (defmacro warn
   "Augments `log/warn` with automatic file and line context."
   [& msg]
-  `(log/warn ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+  `(log/warn ~@(list* (str *file* ":" (:line (meta &form)) " - ") msg)))
 
 (defmacro error
   "Augments `log/error` with automatic file and line context."
   [& msg]
-  `(log/error ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+  `(log/error ~@(list* (str *file* ":" (:line (meta &form)) " - ") msg)))
 
 (comment
   (debug "Debug message with file/line context.")
