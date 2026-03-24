@@ -235,31 +235,31 @@
         ^org.lwjgl.vulkan.VkDevice dev (renderer/get-device renderer)
         pd (.getPhysicalDevice dev)
         rp (renderer/get-render-pass renderer)
-        _ (log/info "mesh/build-pipeline! loading OBJ:" obj-path)
+        _ (spock.util.logging/log-with-context! "mesh/build-pipeline! loading OBJ:" obj-path)
         mesh (obj/load-obj obj-path)]
-    (log/info "mesh/build-pipeline! loaded" obj-path
+    (spock.util.logging/log-with-context! "mesh/build-pipeline! loaded" obj-path
               "verts=" (:vertex-count mesh) "indices=" (:index-count mesh))
 
-    (log/info "mesh/build-pipeline! uploading vertex buffer...")
+    (spock.util.logging/log-with-context! "mesh/build-pipeline! uploading vertex buffer...")
     (reset! vbuf-atom
             (upload-float-buffer! dev pd (:vertices mesh)
                                   VK10/VK_BUFFER_USAGE_VERTEX_BUFFER_BIT))
 
-    (log/info "mesh/build-pipeline! uploading index buffer...")
+    (spock.util.logging/log-with-context! "mesh/build-pipeline! uploading index buffer...")
     (reset! ibuf-atom
             (upload-int-buffer! dev pd (:indices mesh)
                                 VK10/VK_BUFFER_USAGE_INDEX_BUFFER_BIT))
 
     (reset! index-count (:index-count mesh))
 
-    (log/info "mesh/build-pipeline! compiling shaders...")
+    (spock.util.logging/log-with-context! "mesh/build-pipeline! compiling shaders...")
     (let [_ (compiler/compile-glsl "src/shaders/mesh.vert")
           vert-spv (compiler/load-spirv "src/shaders/mesh.vert.spv")
-          _ (log/info "mesh/build-pipeline! vert-spv:" (some? vert-spv))
+          _ (spock.util.logging/log-with-context! "mesh/build-pipeline! vert-spv:" (some? vert-spv))
           _ (compiler/compile-glsl "src/shaders/mesh.frag")
           frag-spv (compiler/load-spirv "src/shaders/mesh.frag.spv")
-          _ (log/info "mesh/build-pipeline! frag-spv:" (some? frag-spv))
-          _ (log/info "mesh/build-pipeline! building pipeline...")
+          _ (spock.util.logging/log-with-context! "mesh/build-pipeline! frag-spv:" (some? frag-spv))
+          _ (spock.util.logging/log-with-context! "mesh/build-pipeline! building pipeline...")
           pl (-> (pipeline/builder dev rp)
                  (pipeline/vert-spv vert-spv)
                  (pipeline/frag-spv frag-spv)
@@ -272,7 +272,7 @@
                                          {:location 2 :format vk-fmt-rg32f  :offset 24}])
                  (pipeline/push-constant-size push-constant-bytes)
                  (pipeline/build!))]
-      (log/info "mesh/build-pipeline! OK")
+      (spock.util.logging/log-with-context! "mesh/build-pipeline! OK")
       (reset! pipeline-atom pl))))
 
 ;; ---------------------------------------------------------------------------
