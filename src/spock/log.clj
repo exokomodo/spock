@@ -55,7 +55,7 @@
   (<= (get level-rank level 99)
       (get level-rank @log-level 2)))
 
-(defn write! [level & args]
+(defn -write! [level & args]
   (when (enabled? level)
     (let [ts   (.format fmt (LocalDateTime/now))
           msg  (apply str (interpose " " (map str args)))
@@ -68,23 +68,23 @@
 
 (defmacro error [& args]
   (let [prefix (str *file* ":" (:line (meta &form)))]
-    `(write! :error ~prefix ~@args)))
+    `(-write! :error ~prefix ~@args)))
 
 (defmacro warn [& args]
   (let [prefix (str *file* ":" (:line (meta &form)))]
-    `(write! :warn ~prefix ~@args)))
+    `(-write! :warn ~prefix ~@args)))
 
 (defmacro info [& args]
   (let [prefix (str *file* ":" (:line (meta &form)))]
-    `(write! :info ~prefix ~@args)))
+    `(-write! :info ~prefix ~@args)))
 
 (defmacro debug [& args]
   (let [prefix (str *file* ":" (:line (meta &form)))]
-    `(write! :debug ~prefix ~@args)))
+    `(-write! :debug ~prefix ~@args)))
 
 (defmacro trace [& args]
   (let [prefix (str *file* ":" (:line (meta &form)))]
-    `(write! :trace ~prefix ~@args)))
+    `(-write! :trace ~prefix ~@args)))
 
 (defmacro log
   "Backward-compatible alias — logs at :debug level.
@@ -92,4 +92,4 @@
    now silenced at the default :info level."
   [& args]
   (let [prefix (str *file* ":" (:line (meta &form)))]
-    `(write! :debug ~prefix ~@args)))
+    `(-write! :debug ~prefix ~@args)))
