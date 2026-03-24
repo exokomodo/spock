@@ -1,15 +1,30 @@
 (ns spock.log
-  "Enhanced logging with file and line context.")
+  "Logging utilities.")
 
-(defmacro log-with-context!
-  "Wraps a log call with the file and line number at the call site.
-   Example usage: (log-with-context! :info \"Loaded successfully\")"
-  [level & msg]
-  `(let [file# ~(or *file* "<unknown>")     ;; File where macro is called
-         line# ~(or (:line (meta &form)) -1) ;; Line where macro is called
-         msg#   (str file# ":" line# " - " ~@msg)]
-     (clojure.tools.logging/log ~level msg#)))
+(require '[clojure.tools.logging :as log])
+
+(defmacro debug
+  "Augments `log/debug` with automatic file and line context."
+  [& msg]
+  `(log/debug ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+
+(defmacro info
+  "Augments `log/info` with automatic file and line context."
+  [& msg]
+  `(log/info ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+
+(defmacro warn
+  "Augments `log/warn` with automatic file and line context."
+  [& msg]
+  `(log/warn ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
+
+(defmacro error
+  "Augments `log/error` with automatic file and line context."
+  [& msg]
+  `(log/error ~(str *file* ":" (:line (meta &form)) " - " ~@msg)))
 
 (comment
-  ;; Example usage:
-  (log-with-context! :info "This is a test log. "))
+  (debug "Debug message with file/line context.")
+  (info "Info message with file/line context.")
+  (warn "Warn message with file/line context.")
+  (error "Error message with file/line context."))
