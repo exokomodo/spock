@@ -146,7 +146,7 @@
         (when (instance? Exception ready-val)
           (throw ready-val)))
       (audio/init!)
-      (audio/set-master-volume! (double (:master-volume @settings/settings 1.0)))
+      (audio/set-master-volume! (double (:master-volume @spock.settings/logging-config 1.0)))
       (on-init! lifecycle)
       (swap! (:state game) assoc :running? true)
       (loop [last-t (System/nanoTime)]
