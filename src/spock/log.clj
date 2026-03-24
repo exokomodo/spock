@@ -1,7 +1,13 @@
 (ns spock.log
-  "Logging utilities.")
+  "Logging utilities. Configures logging to write to a file.")
 
-(require '[clojure.tools.logging :as log])
+(require '[clojure.tools.logging :as log]
+         '[clojure.java.io :as io]
+         '[spock.settings :refer [logging-config]])
+
+;; Ensure log directory exists
+(let [{:keys [file]} logging-config]
+  (.mkdirs (io/file (.getParent (io/file file)))))
 
 (defmacro debug
   "Augments `log/debug` with automatic file and line context."
