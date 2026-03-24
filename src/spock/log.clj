@@ -55,7 +55,7 @@
   (<= (get level-rank level 99)
       (get level-rank @log-level 2)))
 
-(defn- write! [level & args]
+(defn write! [level & args]
   (when (enabled? level)
     (let [ts   (.format fmt (LocalDateTime/now))
           msg  (apply str (interpose " " (map str args)))
